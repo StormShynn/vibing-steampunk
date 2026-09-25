@@ -1095,6 +1095,48 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 		), s.handleCreateTable)
 	}
 
+	if shouldRegister("CreateDataElement") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateDataElement",
+			mcp.WithDescription("Create and activate a DDIC data element: POST, then lock, fill the server's own document (type, labels, change-document flag), write back, unlock, activate. Give either domain, or data_type + length."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Data element name (Z/Y, max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Short description")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (optional for local packages)")),
+			mcp.WithString("domain", mcp.Description("Domain name (typeKind=domain). Leave empty to use data_type")),
+			mcp.WithString("data_type", mcp.Description("Built-in type when no domain: CHAR, NUMC, DEC, INT4, DATS, TIMS, CURR, QUAN, CUKY, UNIT, STRG ...")),
+			mcp.WithNumber("length", mcp.Description("Length for data_type")),
+			mcp.WithNumber("decimals", mcp.Description("Decimals for data_type (default 0)")),
+			mcp.WithString("short_label", mcp.Description("Short field label (max 10)")),
+			mcp.WithString("medium_label", mcp.Description("Medium field label (max 20)")),
+			mcp.WithString("long_label", mcp.Description("Long field label (max 40)")),
+			mcp.WithString("heading_label", mcp.Description("Heading (max 55)")),
+			mcp.WithBoolean("change_document", mcp.Description("Set the change-document flag")),
+		), s.handleCreateDataElement)
+	}
+
+	if shouldRegister("CreateDomain") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateDomain",
+			mcp.WithDescription("Create and activate a DDIC domain (data type, length, decimals, output length, lowercase). Fixed values are not set - add them in ADT."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Domain name (Z/Y, max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Short description")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (optional for local packages)")),
+			mcp.WithString("data_type", mcp.Required(), mcp.Description("CHAR, NUMC, DEC, INT4, DATS, TIMS, CURR, QUAN, CUKY, UNIT ...")),
+			mcp.WithNumber("length", mcp.Description("Length")),
+			mcp.WithNumber("decimals", mcp.Description("Decimals (default 0)")),
+			mcp.WithNumber("output_length", mcp.Description("Output length (default: length, +1 with decimals)")),
+			mcp.WithBoolean("lowercase", mcp.Description("Allow lower-case values")),
+		), s.handleCreateDomain)
+	}
+
+	if shouldRegister("GetDDICObjectXML") {
+		s.mcpServer.AddTool(mcp.NewTool("GetDDICObjectXML",
+			mcp.WithDescription("Read the raw ADT document of a data element (DTEL) or domain (DOMA): type, lengths, labels, flags, fixed values."),
+			mcp.WithString("object_type", mcp.Required(), mcp.Description("DTEL or DOMA")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Object name")),
+		), s.handleGetDDICObjectXML)
+	}
+
 	if shouldRegister("CompareSource") {
 		s.mcpServer.AddTool(mcp.NewTool("CompareSource",
 			mcp.WithDescription("Compare source code of two objects and return unified diff. Supports all object types from GetSource."),
