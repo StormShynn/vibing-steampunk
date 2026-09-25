@@ -1,0 +1,72 @@
+# FIS - build vsp.exe cho Windows va tao GitHub Release tren fork StormShynn/vibing-steampunk.
+# Chay tay: Actions -> "FIS release (Windows exe)" -> Run workflow.
+# Khong dung .goreleaser.yml (file do tro release ve oisee/vibing-steampunk) va khong push gi len main.
+# install-vsp.ps1 cua plugin fis-sap-public-cloud tai:
+#   https://github.com/StormShynn/vibing-steampunk/releases/latest/download/vsp-windows-amd64.exe
+name: FIS release (Windows exe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag cho release, vd fis-2026.09.25 (chi chu, so, . - _)"
+        required: true
+      run_tests:
+        description: "Chay go test truoc khi build"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Kiem tra tag
+        run: |
+          if ! [[ "$TAG" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+            echo "Tag khong hop le: $TAG"; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        if: ${{ inputs.run_tests }}
+        run: go test ./...
+
+      - name: Build vsp-windows-amd64.exe
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          COMMIT=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p dist
+          go build -trimpath \
+            -ldflags "-s -w -X main.Version=${TAG} -X main.Commit=${COMMIT} -X main.BuildDate=${DATE}" \
+            -o dist/vsp-windows-amd64.exe ./cmd/vsp
+          cd dist && sha256sum vsp-windows-amd64.exe > checksums.txt && cat checksums.txt
+
+      - name: Tao release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT=$(git rev-parse --short HEAD)
+          gh release create "$TAG" \
+            dist/vsp-windows-amd64.exe dist/checksums.txt LICENSE NOTICE \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG (FIS Windows build)" \
+            --notes "Ban build vsp.exe cho Windows amd64 tu commit ${COMMIT}, dung cho plugin fis-sap-public-cloud (install-vsp.ps1 tai releases/latest). SHA-256 trong checksums.txt." \
+            --latest
