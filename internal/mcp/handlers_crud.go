@@ -133,6 +133,15 @@ func (s *Server) handleUpdateSource(ctx context.Context, request mcp.CallToolReq
 		sourceURL = objectURL + "/source/main"
 	}
 
+	if lockHandle == "" {
+		// Resolve and approve the package BEFORE the lock (issue #91): the
+		// lookup is stateless and would retire the session holding the handle.
+		var gateErr error
+		ctx, gateErr = s.adtClient.PrepareMutation(ctx, adt.OpUpdate, "UpdateSource", objectURL, transport)
+		if gateErr != nil {
+			return newToolResultError(fmt.Sprintf("Failed to update source: %v", gateErr)), nil
+		}
+	}
 	err := s.withObjectLock(ctx, objectURL, lockHandle, func(handle string) error {
 		return s.adtClient.UpdateSource(ctx, sourceURL, source, handle, transport)
 	})
@@ -563,6 +572,15 @@ func (s *Server) handleDeleteObject(ctx context.Context, request mcp.CallToolReq
 		transport = t
 	}
 
+	if lockHandle == "" {
+		// Resolve and approve the package BEFORE the lock (issue #91): the
+		// lookup is stateless and would retire the session holding the handle.
+		var gateErr error
+		ctx, gateErr = s.adtClient.PrepareMutation(ctx, adt.OpDelete, "DeleteObject", objectURL, transport)
+		if gateErr != nil {
+			return newToolResultError(fmt.Sprintf("Failed to delete object: %v", gateErr)), nil
+		}
+	}
 	err := s.withObjectLockConsumed(ctx, objectURL, lockHandle, func(handle string) error {
 		return s.adtClient.DeleteObject(ctx, objectURL, handle, transport)
 	})
