@@ -66,6 +66,15 @@ func (s *Server) handleCreateTestInclude(ctx context.Context, request mcp.CallTo
 	}
 
 	classURL := adt.GetObjectURL(adt.ObjectTypeClass, className, "")
+	if lockHandle == "" {
+		// Resolve and approve the package BEFORE the lock (issue #91): the
+		// lookup is stateless and would retire the session holding the handle.
+		var gateErr error
+		ctx, gateErr = s.adtClient.PrepareMutation(ctx, adt.OpCreate, "CreateTestInclude", classURL, transport)
+		if gateErr != nil {
+			return newToolResultError(fmt.Sprintf("Failed to create test include: %v", gateErr)), nil
+		}
+	}
 	err := s.withObjectLock(ctx, classURL, lockHandle, func(handle string) error {
 		return s.adtClient.CreateTestInclude(ctx, className, handle, transport)
 	})
@@ -104,6 +113,15 @@ func (s *Server) handleUpdateClassInclude(ctx context.Context, request mcp.CallT
 	}
 
 	classURL := adt.GetObjectURL(adt.ObjectTypeClass, className, "")
+	if lockHandle == "" {
+		// Resolve and approve the package BEFORE the lock (issue #91): the
+		// lookup is stateless and would retire the session holding the handle.
+		var gateErr error
+		ctx, gateErr = s.adtClient.PrepareMutation(ctx, adt.OpUpdate, "UpdateClassInclude", classURL, transport)
+		if gateErr != nil {
+			return newToolResultError(fmt.Sprintf("Failed to update class include: %v", gateErr)), nil
+		}
+	}
 	err := s.withObjectLock(ctx, classURL, lockHandle, func(handle string) error {
 		return s.adtClient.UpdateClassInclude(ctx, className, adt.ClassIncludeType(includeType), source, handle, transport)
 	})
