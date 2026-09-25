@@ -38,6 +38,9 @@ type DataElementLabels struct {
 	RequestedLanguage string `json:"requestedLanguage,omitempty"`
 	MasterLanguage    string `json:"masterLanguage,omitempty"`
 	Translated        bool   `json:"translated"`
+	// SameAsMaster: the labels equal the master-language labels, i.e. most
+	// likely no translation exists for the requested language.
+	SameAsMaster bool `json:"sameAsMaster"`
 	// ChangeDocument mirrors the data element's change-document flag.
 	ChangeDocument bool `json:"changeDocument"`
 }
@@ -138,20 +141,41 @@ func (c *Client) GetDataElementLabels(ctx context.Context, name, lang string) (*
 	// master language rather than empty, so a caller cannot read "these are the
 	// English labels" out of a successful call. That is ADT's behaviour and not
 	// something to paper over here.
-	answered := strings.ToUpper(doc.Language)
-	return &DataElementLabels{
+	master := strings.ToUpper(doc.MasterLanguage)
+	out := &DataElementLabels{
 		Short:             doc.DataElement.Short,
 		Medium:            doc.DataElement.Medium,
 		Long:              doc.DataElement.Long,
 		Heading:           doc.DataElement.Heading,
-		Language:          answered,
+		Language:          strings.ToUpper(doc.Language),
 		RequestedLanguage: lang,
-		MasterLanguage:    strings.ToUpper(doc.MasterLanguage),
-		// Unknown answer language (older ADT without the attribute) counts as
-		// translated, matching the previous behaviour.
-		Translated:     answered == "" || lang == "" || answered == lang,
-		ChangeDocument: doc.DataElement.ChangeDocument,
-	}, nil
+		MasterLanguage:    master,
+		Translated:        true,
+		ChangeDocument:    doc.DataElement.ChangeDocument,
+	}
+	// adtcore:language only echoes the requested language: on S/4HANA Cloud
+	// Public Edition BUKRS asked in EN or VI comes back with language="EN"/"VI"
+	// and the German master texts. The only reliable signal is to read the
+	// master-language labels too and compare. Identical labels mean "no own
+	// translation" (a genuine translation that equals the master, e.g.
+	// "Material", is reported the same way — callers see SameAsMaster).
+	if master != "" && lang != "" && master != lang {
+		resp2, err2 := c.transport.Request(ctx, path, &RequestOptions{
+			Method:           http.MethodGet,
+			Accept:           "application/vnd.sap.adt.dataelements.v2+xml",
+			OverrideLanguage: master,
+		})
+		if err2 == nil {
+			var m dataElementDoc
+			if xml.Unmarshal(resp2.Body, &m) == nil {
+				same := m.DataElement.Short == out.Short && m.DataElement.Medium == out.Medium &&
+					m.DataElement.Long == out.Long && m.DataElement.Heading == out.Heading
+				out.SameAsMaster = same
+				out.Translated = !same
+			}
+		}
+	}
+	return out, nil
 }
 
 // GetMessageClassTexts retrieves all messages of a message class in a specific language.
