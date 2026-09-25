@@ -100,3 +100,20 @@ func (c *Client) PrepareSourceUpdate(ctx context.Context, objectURL, transport s
 		Transport: transport,
 	})
 }
+
+// PrepareMutation is the exported, op-generic form of gateAndMark for MCP
+// handlers that take their own lock around a single mutator (DeleteObject,
+// UpdateClassInclude, CreateTestInclude, UpdateSource). Without it the
+// mutator's own checkMutation resolves the package *inside* the lock window;
+// that lookup is stateless, retires the session the lock handle belongs to,
+// and the write/delete fails with 423 ExceptionResourceInvalidLockHandle
+// (seen on S/4HANA Cloud Public Edition with SSO cookies, issue #91 class).
+// Call it before LOCK and use the returned context for the whole window.
+func (c *Client) PrepareMutation(ctx context.Context, op OperationType, opName, objectURL, transport string) (context.Context, error) {
+	return c.gateAndMark(ctx, MutationContext{
+		Op:        op,
+		OpName:    opName,
+		ObjectURL: objectURL,
+		Transport: transport,
+	})
+}
