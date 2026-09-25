@@ -313,7 +313,7 @@ func (t *Transport) request(ctx context.Context, path string, opts *RequestOptio
 	// The same expiry reaches a plain read as a successful-looking response that
 	// was in fact served by the identity provider. Nothing downstream would
 	// recognise the logon page it carries, so catch it here by origin.
-	if resp.StatusCode < 400 && t.canReauth() && t.redirectedAwayFromSAP(resp) {
+	if resp.StatusCode < 400 && t.canReauth() && (t.redirectedAwayFromSAP(resp) || servedSSOLogonPage(resp, body)) {
 		t.setCSRFToken("")
 		t.setSessionID("")
 		if err := t.callReauthFunc(ctx); err != nil {
@@ -447,6 +447,12 @@ func (t *Transport) retryRequest(ctx context.Context, path string, opts *Request
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 	traceHTTPResponse(resp, body)
+
+	// Still the identity provider's page after a fresh session: say so instead
+	// of handing an HTML login form to an XML/source parser downstream.
+	if resp.StatusCode < 400 && servedSSOLogonPage(resp, body) {
+		return nil, fmt.Errorf("SSO session could not be renewed for %s: the server still answers with the identity provider's logon page — sign in again (vsp sso login)", path)
+	}
 
 	if resp.StatusCode >= 400 {
 		return nil, &APIError{
@@ -616,6 +622,35 @@ func (t *Transport) redirectedAwayFromSAP(resp *http.Response) bool {
 		return false
 	}
 	return !strings.EqualFold(resp.Request.URL.Host, base.Host)
+}
+
+// servedSSOLogonPage reports whether a 2xx response is in fact the SAML logon
+// hand-off rather than ADT content. On SAP S/4HANA Cloud Public Edition an
+// expired browser session is answered on the SAP host itself with 200 and an
+// auto-submitting HTML form that POSTs a SAMLRequest to the IAS tenant — no
+// HTTP redirect, so redirectedAwayFromSAP cannot see it, and without this the
+// form reached callers as "source code" or broke XML parsing
+// ("expected element … but have <html>", "invalid character entity").
+// ADT itself never serves such a form, so the marker is unambiguous.
+func servedSSOLogonPage(resp *http.Response, body []byte) bool {
+	if resp == nil || len(body) == 0 {
+		return false
+	}
+	ct := strings.ToLower(resp.Header.Get("Content-Type"))
+	if ct != "" && !strings.Contains(ct, "html") {
+		return false
+	}
+	head := body
+	if len(head) > 16384 {
+		head = head[:16384]
+	}
+	lower := bytes.ToLower(head)
+	if !bytes.Contains(lower, []byte("<html")) && !bytes.Contains(lower, []byte("<form")) {
+		return false
+	}
+	return bytes.Contains(head, []byte(`name="SAMLRequest"`)) ||
+		bytes.Contains(head, []byte(`name="SAMLResponse"`)) ||
+		bytes.Contains(lower, []byte("/saml2/idp/sso"))
 }
 
 // canReauth reports whether a fresh session can be obtained without asking

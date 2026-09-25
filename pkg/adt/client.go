@@ -167,7 +167,12 @@ func (c *Client) getObjectPackage(ctx context.Context, objectURL string) (string
 		return "", err
 	}
 
-	results, err := c.SearchObject(ctx, objectName, 20)
+	// Stateful on purpose (#91 / 423): when the caller supplied a lock_handle
+	// from an earlier LockObject call, this lookup runs INSIDE the lock window.
+	// A stateless request would retire the ADT session that owns the handle and
+	// the following write/delete fails with ExceptionResourceInvalidLockHandle.
+	// A stateful GET keeps that session alive and is harmless outside a window.
+	results, err := c.searchObjects(ctx, objectName, "", 20, true)
 	if err != nil {
 		return "", err
 	}
@@ -337,6 +342,12 @@ func CanonicalObjectType(s string) string {
 // maxResults: filtering after the fact silently drops results that didn't
 // fit in the pre-filter window.
 func (c *Client) SearchObjectByType(ctx context.Context, query, objectType string, maxResults int) ([]SearchResult, error) {
+	return c.searchObjects(ctx, query, objectType, maxResults, false)
+}
+
+// searchObjects is SearchObjectByType with an explicit session mode. The
+// package gate uses stateful=true so it never retires a lock-holding session.
+func (c *Client) searchObjects(ctx context.Context, query, objectType string, maxResults int, stateful bool) ([]SearchResult, error) {
 	if maxResults <= 0 {
 		maxResults = 100
 	}
@@ -355,9 +366,10 @@ func (c *Client) SearchObjectByType(ctx context.Context, query, objectType strin
 	}
 
 	resp, err := c.transport.Request(ctx, "/sap/bc/adt/repository/informationsystem/search", &RequestOptions{
-		Method: http.MethodGet,
-		Query:  params,
-		Accept: "application/xml",
+		Method:   http.MethodGet,
+		Query:    params,
+		Accept:   "application/xml",
+		Stateful: stateful,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("search request failed: %w", err)

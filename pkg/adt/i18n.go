@@ -30,6 +30,16 @@ type DataElementLabels struct {
 	Medium  string `json:"medium"`
 	Long    string `json:"long"`
 	Heading string `json:"heading"`
+	// Language is the language ADT actually answered in (adtcore:language).
+	// It differs from the requested one when no translation exists — ADT then
+	// falls back to the master language — so callers can tell "these are the
+	// Vietnamese labels" from "there are no Vietnamese labels".
+	Language          string `json:"language,omitempty"`
+	RequestedLanguage string `json:"requestedLanguage,omitempty"`
+	MasterLanguage    string `json:"masterLanguage,omitempty"`
+	Translated        bool   `json:"translated"`
+	// ChangeDocument mirrors the data element's change-document flag.
+	ChangeDocument bool `json:"changeDocument"`
 }
 
 // dataElementDoc is the representation ADT actually serves for a data element.
@@ -38,12 +48,15 @@ type DataElementLabels struct {
 // type, the field lengths and a dozen flags, and mapping those would be
 // inventing a feature under cover of a bug fix.
 type dataElementDoc struct {
-	XMLName     xml.Name `xml:"wbobj"`
-	DataElement struct {
-		Short   string `xml:"shortFieldLabel"`
-		Medium  string `xml:"mediumFieldLabel"`
-		Long    string `xml:"longFieldLabel"`
-		Heading string `xml:"headingFieldLabel"`
+	XMLName        xml.Name `xml:"wbobj"`
+	Language       string   `xml:"language,attr"`
+	MasterLanguage string   `xml:"masterLanguage,attr"`
+	DataElement    struct {
+		Short          string `xml:"shortFieldLabel"`
+		Medium         string `xml:"mediumFieldLabel"`
+		Long           string `xml:"longFieldLabel"`
+		Heading        string `xml:"headingFieldLabel"`
+		ChangeDocument bool   `xml:"changeDocument"`
 	} `xml:"dataElement"`
 }
 
@@ -125,11 +138,19 @@ func (c *Client) GetDataElementLabels(ctx context.Context, name, lang string) (*
 	// master language rather than empty, so a caller cannot read "these are the
 	// English labels" out of a successful call. That is ADT's behaviour and not
 	// something to paper over here.
+	answered := strings.ToUpper(doc.Language)
 	return &DataElementLabels{
-		Short:   doc.DataElement.Short,
-		Medium:  doc.DataElement.Medium,
-		Long:    doc.DataElement.Long,
-		Heading: doc.DataElement.Heading,
+		Short:             doc.DataElement.Short,
+		Medium:            doc.DataElement.Medium,
+		Long:              doc.DataElement.Long,
+		Heading:           doc.DataElement.Heading,
+		Language:          answered,
+		RequestedLanguage: lang,
+		MasterLanguage:    strings.ToUpper(doc.MasterLanguage),
+		// Unknown answer language (older ADT without the attribute) counts as
+		// translated, matching the previous behaviour.
+		Translated:     answered == "" || lang == "" || answered == lang,
+		ChangeDocument: doc.DataElement.ChangeDocument,
 	}, nil
 }
 
