@@ -55,6 +55,16 @@ type DomainOptions struct {
 	Decimals    int
 	OutputLen   int  // 0 = same as Length
 	Lowercase   bool // allow lower-case values
+	// FixedValues replaces the domain's fixed values (single values or
+	// intervals). Empty = leave the server default (none).
+	FixedValues []DomainFixedValue
+}
+
+// DomainFixedValue is one fixed value (Low) or interval (Low..High) of a domain.
+type DomainFixedValue struct {
+	Low  string
+	High string
+	Text string // short text, max 60
 }
 
 // ddicCreate runs POST (minimal) -> LOCK -> GET -> edit -> PUT -> UNLOCK -> ACTIVATE.
@@ -114,6 +124,13 @@ func (c *Client) ddicCreate(ctx context.Context, opName, collection, contentType
 	if err != nil {
 		return fail("preparing the object document", err)
 	}
+	// The document the server returns right after the POST carries no
+	// adtcore:description (seen on S/4HANA Cloud Public Edition, 2026-09-26),
+	// and the PUT is then refused with SWB_TOOL 019 "The description is
+	// missing". Always write the description back onto the root element.
+	if doc, err = setRootDescription(doc, rootTag, description); err != nil {
+		return fail("preparing the object document", err)
+	}
 
 	put := url.Values{}
 	put.Set("lockHandle", lock.LockHandle)
@@ -162,11 +179,14 @@ func (c *Client) CreateDataElement(ctx context.Context, o DataElementOptions) (s
 		func(doc string) (string, error) { return editDataElementDoc(doc, o) })
 }
 
-// CreateDomain creates and activates a domain (no fixed values — add them in ADT).
+// CreateDomain creates and activates a domain, with optional fixed values.
 func (c *Client) CreateDomain(ctx context.Context, o DomainOptions) (string, error) {
 	o.DataType = strings.ToUpper(strings.TrimSpace(o.DataType))
 	if o.DataType == "" || o.Length <= 0 && !fixedLengthType(o.DataType) {
 		return "", fmt.Errorf("CreateDomain: data_type and length are required")
+	}
+	if err := validateFixedValues(o); err != nil {
+		return "", fmt.Errorf("CreateDomain: %w", err)
 	}
 	return c.ddicCreate(ctx, "CreateDomain", domaCollection, domaContentType, "DOMA/DD",
 		"doma:domain", `doma="http://www.sap.com/dictionary/domain"`,
@@ -195,6 +215,33 @@ func setElem(doc, qname, value string) (string, bool) {
 		return doc[:loc[0]] + "<" + qname + ">" + v + "</" + qname + ">" + doc[loc[1]:], true
 	}
 	return doc, false
+}
+
+var rootDescAttr = regexp.MustCompile(`\sadtcore:description="[^"]*"`)
+
+// setRootDescription sets adtcore:description on the document's root element,
+// adding the attribute when the server left it out.
+func setRootDescription(doc, rootTag, description string) (string, error) {
+	i := strings.Index(doc, "<"+rootTag)
+	if i < 0 {
+		return doc, fmt.Errorf("root element %s not found in the server document", rootTag)
+	}
+	j := strings.IndexByte(doc[i:], '>')
+	if j < 0 {
+		return doc, fmt.Errorf("root element %s is not closed", rootTag)
+	}
+	j += i
+	head, tail := doc[i:j], ""
+	if strings.HasSuffix(head, "/") {
+		head, tail = head[:len(head)-1], "/"
+	}
+	attr := ` adtcore:description="` + escapeXML(description) + `"`
+	if rootDescAttr.MatchString(head) {
+		head = rootDescAttr.ReplaceAllLiteralString(head, attr)
+	} else {
+		head += attr
+	}
+	return doc[:i] + head + tail + doc[j:], nil
 }
 
 func editDataElementDoc(doc string, o DataElementOptions) (string, error) {
@@ -268,7 +315,50 @@ func editDomainDoc(doc string, o DomainOptions) (string, error) {
 			outPart, _ = setElem(outPart, "doma:lowercase", "true")
 		}
 	}
-	return typePart + outPart, nil
+	doc = typePart + outPart
+	if len(o.FixedValues) > 0 {
+		var b strings.Builder
+		b.WriteString("<doma:fixValues>")
+		for i, fv := range o.FixedValues {
+			fmt.Fprintf(&b, "<doma:fixValue><doma:position>%04d</doma:position><doma:low>%s</doma:low><doma:high>%s</doma:high><doma:text>%s</doma:text></doma:fixValue>",
+				i+1, escapeXML(fv.Low), escapeXML(fv.High), escapeXML(fv.Text))
+		}
+		b.WriteString("</doma:fixValues>")
+		loc := fixValuesElem.FindStringIndex(doc)
+		if loc == nil {
+			return "", fmt.Errorf("element doma:fixValues not found in the server document")
+		}
+		doc = doc[:loc[0]] + b.String() + doc[loc[1]:]
+	}
+	return doc, nil
+}
+
+var fixValuesElem = regexp.MustCompile(`(?s)<doma:fixValues\s*/>|<doma:fixValues>.*?</doma:fixValues>`)
+
+func validateFixedValues(o DomainOptions) error {
+	seen := map[string]bool{}
+	for i, fv := range o.FixedValues {
+		if utf8.RuneCountInString(fv.Text) > 60 {
+			return fmt.Errorf("fixed value %d: text longer than 60 characters", i+1)
+		}
+		if fv.Text == "" {
+			return fmt.Errorf("fixed value %d (%q): text is required", i+1, fv.Low)
+		}
+		for _, v := range []string{fv.Low, fv.High} {
+			if o.Length > 0 && utf8.RuneCountInString(v) > o.Length {
+				return fmt.Errorf("fixed value %q is longer than the domain length %d", v, o.Length)
+			}
+			if !o.Lowercase && v != strings.ToUpper(v) {
+				return fmt.Errorf("fixed value %q has lower-case letters but lowercase=false", v)
+			}
+		}
+		k := fv.Low + "\x00" + fv.High
+		if seen[k] {
+			return fmt.Errorf("fixed value %q is listed twice", fv.Low)
+		}
+		seen[k] = true
+	}
+	return nil
 }
 
 // GetDDICObjectXML returns the raw ADT document of a data element or domain —
