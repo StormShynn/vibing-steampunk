@@ -1,0 +1,76 @@
+# FIS - build vsp cho Windows + macOS (+ Linux) va tao MOT GitHub Release tren fork StormShynn/vibing-steampunk.
+# Thay cho fis-release-windows.yml (giu nguyen ten asset Windows nen install-vsp.ps1 khong doi).
+# Chay tay: Actions -> "FIS release (Windows + macOS)" -> Run workflow.
+# Dat file vao .github/workflows/fis-release.yml cua fork. Khong push gi len main, khong dung .goreleaser.yml.
+# Plugin tai:
+#   Windows : releases/latest/download/vsp-windows-amd64.exe   (install-vsp.ps1)
+#   macOS   : releases/latest/download/vsp-darwin-arm64 | vsp-darwin-amd64   (install-vsp.sh)
+#   Linux   : releases/latest/download/vsp-linux-amd64
+name: FIS release (Windows + macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag cho release, vd fis-2026.09.28 (chi chu, so, . - _)"
+        required: true
+      run_tests:
+        description: "Chay go test truoc khi build"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Kiem tra tag
+        run: |
+          if ! [[ "$TAG" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+            echo "Tag khong hop le: $TAG"; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        if: ${{ inputs.run_tests }}
+        run: go test ./...
+
+      - name: Build (cross-compile, CGO tat)
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          COMMIT=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          LDF="-s -w -X main.Version=${TAG} -X main.Commit=${COMMIT} -X main.BuildDate=${DATE}"
+          mkdir -p dist
+          for t in windows/amd64 darwin/arm64 darwin/amd64 linux/amd64; do
+            os=${t%/*}; arch=${t#*/}; ext=""; [ "$os" = windows ] && ext=".exe"
+            echo "== $os/$arch"
+            GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDF" -o "dist/vsp-${os}-${arch}${ext}" ./cmd/vsp
+          done
+          cd dist && sha256sum vsp-* > checksums.txt && cat checksums.txt
+
+      - name: Tao release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT=$(git rev-parse --short HEAD)
+          gh release create "$TAG" \
+            dist/vsp-* dist/checksums.txt LICENSE NOTICE \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG (FIS build Windows + macOS)" \
+            --notes "vsp cho plugin fis-sap-public-cloud tu commit ${COMMIT}: Windows amd64, macOS arm64 (Apple Silicon) / amd64 (Intel), Linux amd64. Ban macOS chua ky (unsigned) - install-vsp.sh tai bang curl nen khong bi Gatekeeper chan. SHA-256 trong checksums.txt." \
+            --latest
