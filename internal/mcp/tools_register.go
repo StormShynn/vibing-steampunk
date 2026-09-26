@@ -1149,6 +1149,20 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 		), s.handleGetDDICObjectXML)
 	}
 
+	if shouldRegister("GetADTObjectXML") {
+		s.mcpServer.AddTool(mcp.NewTool("GetADTObjectXML",
+			mcp.WithDescription("Read the raw ADT document of an object vsp has no dedicated reader for: application job catalog entry / template (/sap/bc/adt/applicationjob/...), application log object, change document object, IAM app / catalog, DDIC. Read-only; path must start with one of those ADT areas (use the URI from SearchObject / GetPackage)."),
+			mcp.WithString("object_uri", mcp.Required(), mcp.Description("ADT path, e.g. /sap/bc/adt/applicationjob/catalogs/zjob_einv")),
+		), s.handleGetADTObjectXML)
+	}
+
+	if shouldRegister("RunClass") {
+		s.mcpServer.AddTool(mcp.NewTool("RunClass",
+			mcp.WithDescription("Run a class that implements IF_OO_ADT_CLASSRUN (same as F9 in Eclipse ADT) and return its console output. Executes code on the system: blocked in read-only mode; the class must be in an allowed package. Use only for classes you wrote for the task (setup, test data, diagnostics)."),
+			mcp.WithString("class_name", mcp.Required(), mcp.Description("Class name, e.g. ZCL_FISST_SETUP")),
+		), s.handleRunClass)
+	}
+
 	if shouldRegister("CompareSource") {
 		s.mcpServer.AddTool(mcp.NewTool("CompareSource",
 			mcp.WithDescription("Compare source code of two objects and return unified diff. Supports all object types from GetSource."),

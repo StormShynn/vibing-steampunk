@@ -1114,6 +1114,15 @@ func parsePackageNodeStructure(data []byte, packageName string) (*PackageContent
 		if node.ObjectName == "" {
 			continue
 		}
+		// SAP puts an untyped node ("Error loading node: ...") in the tree when
+		// it cannot load an object (seen on S/4HANA Cloud Public Edition with a
+		// broken/half-deleted object). It is not an object: report it apart
+		// instead of listing it as one.
+		if node.ObjectType == "" {
+			w := strings.TrimSpace(node.ObjectName + " " + node.Desc)
+			pkg.Warnings = append(pkg.Warnings, w)
+			continue
+		}
 		if node.ObjectType == "DEVC/K" {
 			pkg.SubPackages = append(pkg.SubPackages, node.ObjectName)
 		} else {

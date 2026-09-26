@@ -118,6 +118,9 @@ type PackageContent struct {
 	Name        string          `xml:"name,attr"`
 	SubPackages []string        `json:"subPackages,omitempty"`
 	Objects     []PackageObject `json:"objects,omitempty"`
+	// Warnings lists nodes SAP could not load (the tree then contains an
+	// untyped "Error loading node: ..." entry instead of an object).
+	Warnings []string `xml:"-" json:"warnings,omitempty"`
 }
 
 // PackageObject represents an object within a package.

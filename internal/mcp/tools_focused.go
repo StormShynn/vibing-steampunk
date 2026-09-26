@@ -55,6 +55,8 @@ func focusedToolSet() map[string]bool {
 		"CreateDataElement":  true, // Create DDIC data element (FIS)
 		"CreateDomain":       true, // Create DDIC domain (FIS)
 		"GetDDICObjectXML":   true, // Raw DTEL/DOMA document (FIS)
+		"GetADTObjectXML":    true, // Raw ADT document: job catalog/template, CHDO, IAM (FIS)
+		"RunClass":           true, // F9 classrun (FIS)
 		"CompareSource":      true, // Diff two objects
 		"CloneObject":        true, // Copy object to new name
 		"GetClassInfo":       true, // Quick class metadata

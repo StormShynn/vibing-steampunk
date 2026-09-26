@@ -102,3 +102,30 @@ func (s *Server) handleGetDDICObjectXML(ctx context.Context, req mcp.CallToolReq
 	}
 	return mcp.NewToolResultText(x), nil
 }
+
+func (s *Server) handleGetADTObjectXML(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	uri := argString(req, "object_uri")
+	if uri == "" {
+		return newToolResultError("object_uri is required"), nil
+	}
+	body, ctype, err := s.adtClient.GetADTObjectXML(ctx, uri)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("GetADTObjectXML failed: %v", err)), nil
+	}
+	if ctype != "" {
+		body = "Content-Type: " + ctype + "\n\n" + body
+	}
+	return mcp.NewToolResultText(body), nil
+}
+
+func (s *Server) handleRunClass(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	name := argString(req, "class_name")
+	if name == "" {
+		return newToolResultError("class_name is required"), nil
+	}
+	out, err := s.adtClient.RunClass(ctx, name)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(out), nil
+}
