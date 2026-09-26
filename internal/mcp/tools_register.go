@@ -1156,6 +1156,28 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 		), s.handleGetADTObjectXML)
 	}
 
+	if shouldRegister("CreateJobCatalogEntry") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateJobCatalogEntry",
+			mcp.WithDescription("Create and activate an application job catalog entry (SAJC) for a class implementing IF_APJ_DT_EXEC_OBJECT + IF_APJ_RT_EXEC_OBJECT — what the ADT wizard does. Activation also generates the IAM app <name>_SAJC."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Catalog entry name (Z/Y, max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("class_name", mcp.Required(), mcp.Description("Job class")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateJobCatalogEntry)
+	}
+
+	if shouldRegister("CreateJobTemplate") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateJobTemplate",
+			mcp.WithDescription("Create and activate an application job template (SAJT) for an existing job catalog entry — what the ADT wizard does."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Template name (Z/Y, max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("catalog_name", mcp.Required(), mcp.Description("Job catalog entry")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateJobTemplate)
+	}
+
 	if shouldRegister("RunClass") {
 		s.mcpServer.AddTool(mcp.NewTool("RunClass",
 			mcp.WithDescription("Run a class that implements IF_OO_ADT_CLASSRUN (same as F9 in Eclipse ADT) and return its console output. Executes code on the system: blocked in read-only mode; the class must be in an allowed package. Use only for classes you wrote for the task (setup, test data, diagnostics)."),

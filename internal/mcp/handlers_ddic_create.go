@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/oisee/vibing-steampunk/pkg/adt"
@@ -128,4 +129,31 @@ func (s *Server) handleRunClass(ctx context.Context, req mcp.CallToolRequest) (*
 		return newToolResultError(err.Error()), nil
 	}
 	return mcp.NewToolResultText(out), nil
+}
+
+func (s *Server) handleCreateJobCatalogEntry(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.JobCatalogOptions{
+		Name: argString(req, "name"), Description: argString(req, "description"),
+		ClassName: argString(req, "class_name"), Package: argString(req, "package"), Transport: argString(req, "transport"),
+	}
+	objURL, err := s.adtClient.CreateJobCatalogEntry(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": o.Name, "objectUrl": objURL,
+		"package": o.Package, "iamApp": strings.ToUpper(o.Name) + "_SAJC"}, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
+
+func (s *Server) handleCreateJobTemplate(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.JobTemplateOptions{
+		Name: argString(req, "name"), Description: argString(req, "description"),
+		CatalogName: argString(req, "catalog_name"), Package: argString(req, "package"), Transport: argString(req, "transport"),
+	}
+	objURL, err := s.adtClient.CreateJobTemplate(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": o.Name, "objectUrl": objURL, "package": o.Package}, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
 }

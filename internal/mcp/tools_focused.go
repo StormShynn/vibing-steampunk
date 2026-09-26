@@ -43,23 +43,25 @@ func focusedToolSet() map[string]bool {
 		"GetContext":     true, // Dependency context compression
 
 		// Development tools (11)
-		"SyntaxCheck":        true,
-		"RunUnitTests":       true,
-		"RunATCCheck":        true, // Code quality checks
-		"Activate":           true, // Re-activate objects without editing
-		"ActivatePackage":    true, // Batch activation of all inactive objects
-		"PrettyPrint":        true, // Format ABAP code
-		"GetInactiveObjects": true, // List pending activations
-		"CreatePackage":      true, // Create local packages ($...)
-		"CreateTable":        true, // Create DDIC tables from JSON
-		"CreateDataElement":  true, // Create DDIC data element (FIS)
-		"CreateDomain":       true, // Create DDIC domain (FIS)
-		"GetDDICObjectXML":   true, // Raw DTEL/DOMA document (FIS)
-		"GetADTObjectXML":    true, // Raw ADT document: job catalog/template, CHDO, IAM (FIS)
-		"RunClass":           true, // F9 classrun (FIS)
-		"CompareSource":      true, // Diff two objects
-		"CloneObject":        true, // Copy object to new name
-		"GetClassInfo":       true, // Quick class metadata
+		"SyntaxCheck":           true,
+		"RunUnitTests":          true,
+		"RunATCCheck":           true, // Code quality checks
+		"Activate":              true, // Re-activate objects without editing
+		"ActivatePackage":       true, // Batch activation of all inactive objects
+		"PrettyPrint":           true, // Format ABAP code
+		"GetInactiveObjects":    true, // List pending activations
+		"CreatePackage":         true, // Create local packages ($...)
+		"CreateTable":           true, // Create DDIC tables from JSON
+		"CreateDataElement":     true, // Create DDIC data element (FIS)
+		"CreateDomain":          true, // Create DDIC domain (FIS)
+		"GetDDICObjectXML":      true, // Raw DTEL/DOMA document (FIS)
+		"GetADTObjectXML":       true, // Raw ADT document: job catalog/template, CHDO, IAM (FIS)
+		"RunClass":              true, // F9 classrun (FIS)
+		"CreateJobCatalogEntry": true, // SAJC via ADT (FIS)
+		"CreateJobTemplate":     true, // SAJT via ADT (FIS)
+		"CompareSource":         true, // Diff two objects
+		"CloneObject":           true, // Copy object to new name
+		"GetClassInfo":          true, // Quick class metadata
 
 		// LockObject and UnlockObject used to sit here, and focused mode had
 		// nothing that accepts a lock handle — no UpdateSource, no
