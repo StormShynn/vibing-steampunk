@@ -234,7 +234,10 @@ func (c *Client) WriteMessageClassTexts(ctx context.Context, name, lang string, 
 	}
 	// The PUT replaces the whole document: without the description the class
 	// lost its short text on every text write (seen on HL8, 2026-09-27).
-	if cur, gerr := c.GetMessageClass(ctx, name); gerr == nil {
+	// Read it inside the caller's stateful session: a stateless request here
+	// ends that session and the lock handle the PUT carries is gone (423
+	// "invalid lock handle", HL8 2026-09-28).
+	if cur, gerr := c.getMessageClassStateful(ctx, name); gerr == nil {
 		mc.Description = cur.Description
 	}
 	for _, t := range texts {
@@ -503,4 +506,20 @@ type messageClassWrite struct {
 type messageWrite struct {
 	Number string `xml:"mc:msgno,attr"`
 	Text   string `xml:"mc:msgtext,attr"`
+}
+
+// getMessageClassStateful reads a message class without leaving the stateful session.
+func (c *Client) getMessageClassStateful(ctx context.Context, name string) (*MessageClass, error) {
+	path := fmt.Sprintf("/sap/bc/adt/messageclass/%s", url.PathEscape(strings.ToLower(name)))
+	resp, err := c.transport.Request(ctx, path, &RequestOptions{
+		Method: http.MethodGet, Accept: "application/vnd.sap.adt.mc.messageclass+xml", Stateful: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var mc MessageClass
+	if err := xml.Unmarshal(resp.Body, &mc); err != nil {
+		return nil, err
+	}
+	return &mc, nil
 }

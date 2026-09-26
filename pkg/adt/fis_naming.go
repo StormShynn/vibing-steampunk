@@ -21,23 +21,31 @@ import (
 //     working; the first object of a new pattern needs the FIS prefix.
 //
 // Hard in every case: A-Z 0-9 _ only, and the length limit of the type.
+// Database tables are always ZTB_ (FIS rule, no tenant-convention fallback).
 // Updates, deletes and activation are not checked. Namespaced names (/ABC/…)
 // are left to the namespace owner. The prefix table is the error level of the
 // plugin's scripts/naming_lint.py.
 
 type namingRule struct {
-	max  int
-	re   *regexp.Regexp
-	hint string
+	max    int
+	re     *regexp.Regexp
+	hint   string
+	strict bool // the FIS prefix only: no tenant-convention fallback
 }
 
 func nr(max int, pattern, hint string) namingRule {
-	return namingRule{max, regexp.MustCompile(pattern), hint}
+	return namingRule{max: max, re: regexp.MustCompile(pattern), hint: hint}
+}
+
+func strictRule(max int, pattern, hint string) namingRule {
+	r := nr(max, pattern, hint)
+	r.strict = true
+	return r
 }
 
 // fisNamingRules is keyed by the main ADT type (the part before "/").
 var fisNamingRules = map[string]namingRule{
-	"TABL": nr(16, `^[ZY]TB_`, "table ZTB_<MOD>_<entity> (draft ZTB_…_D)"),
+	"TABL": strictRule(16, `^[ZY]TB_`, "table ZTB_<MOD>_<entity> (draft ZTB_…_D) — always ZTB_"),
 	"STRU": nr(30, `^[ZY]ST_`, "structure ZST_<MOD>_<name>"),
 	"DDLS": nr(30, `^[ZY](R|C|I|A)_`, "CDS ZR_ / ZC_ / ZI_ / ZA_"),
 	"BDEF": nr(30, `^[ZY](R|C)_`, "behavior definition = view name ZR_ / ZC_"),
@@ -51,7 +59,7 @@ var fisNamingRules = map[string]namingRule{
 	"MSAG": nr(20, `^[ZY]MS_`, "message class ZMS_<MOD>"),
 	"SRVD": nr(30, `^[ZY](UI|API)_`, "service definition ZUI_ / ZAPI_"),
 	"SRVB": nr(30, `^[ZY](UI|API)_.*_O[24]$`, "service binding ZUI_…_O4 / ZAPI_…_O4 (_O2)"),
-	"SUSO": nr(10, `^[ZY]_`, "authorization object Z_<MOD>_<obj>"),
+	"SUSO": nr(10, `^[ZY]AU_`, "authorization object ZAU_<MOD><obj>, e.g. ZAU_MMSLOC (its SIA3 extension gets the same name)"),
 	"AUTH": nr(10, `^[ZY]`, "authorization field Z…"),
 	"NROB": nr(10, `^[ZY]NR_`, "number range ZNR_<…>"),
 	"ENHO": nr(30, `^[ZY]EI_`, "BAdI implementation ZEI_<MOD>_<…>"),
@@ -107,6 +115,9 @@ func (c *Client) checkFISNaming(ctx context.Context, adtType, name string) error
 	var pe *namingPrefixError
 	if !errors.As(err, &pe) {
 		return err // characters / length: never negotiable
+	}
+	if fisNamingRules[pe.key].strict {
+		return err
 	}
 	prefix := namingPrefix(pe.name)
 	if len(prefix) < 3 {

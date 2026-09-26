@@ -3,6 +3,7 @@ package adt
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 )
@@ -33,14 +34,18 @@ type fisXMLType struct {
 	ns         string
 	adtType    string
 	extraNS    string
+	rootAttrs  string // extra root attributes
 }
 
 var fisXMLTypes = map[CreatableObjectType]fisXMLType{
-	ObjectTypeAuthField:    {"/sap/bc/adt/aps/iam/auth", "auth:auth", `xmlns:auth="http://www.sap.com/iam/auth"`, "AUTH", ""},
-	ObjectTypeAuthObject:   {"/sap/bc/adt/aps/iam/suso", "suso:suso", `xmlns:suso="http://www.sap.com/iam/suso"`, "SUSO/B", ""},
-	ObjectTypeCommScenario: {"/sap/bc/adt/aps/cloud/com/sco1", "sco1:sco1", `xmlns:sco1="http://www.sap.com/com/sco1"`, "SCO1", ""},
+	ObjectTypeAuthField:    {"/sap/bc/adt/aps/iam/auth", "auth:auth", `xmlns:auth="http://www.sap.com/iam/auth"`, "AUTH", "", ""},
+	ObjectTypeAuthObject:   {"/sap/bc/adt/aps/iam/suso", "suso:suso", `xmlns:suso="http://www.sap.com/iam/suso"`, "SUSO/B", "", ""},
+	ObjectTypeCommScenario: {"/sap/bc/adt/aps/cloud/com/sco1", "sco1:sco1", `xmlns:sco1="http://www.sap.com/com/sco1"`, "SCO1", "", ""},
 	ObjectTypeBAdIImpl: {"/sap/bc/adt/enhancements/enhoxhb", "enho:objectData", `xmlns:enho="http://www.sap.com/adt/enhancements/enho"`, "ENHO/XHB",
-		` xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"`},
+		` xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"`,
+		// ZEI_MMIM_SLOC_CHECK (HL8) carries it; without it the POST fails with
+		// "No documentation class is assigned to object R3TR ENHO" [Inference].
+		"\n  adtcore:abapLanguageVersion=\"cloudDevelopment\""},
 }
 
 func init() {
@@ -57,11 +62,11 @@ func init() {
   adtcore:name="%s"
   adtcore:type="%s"
   adtcore:responsible="%s"
-  adtcore:masterLanguage="EN"
+  adtcore:masterLanguage="EN"%s
   adtcore:language="EN">
   <adtcore:packageRef adtcore:name="%s"/>
 %s
-</%s>`, t.root, t.ns, t.extraNS, escapeXML(opts.Description), strings.ToUpper(opts.Name), t.adtType, responsible,
+</%s>`, t.root, t.ns, t.extraNS, escapeXML(opts.Description), strings.ToUpper(opts.Name), t.adtType, responsible, t.rootAttrs,
 				strings.ToUpper(opts.PackageName), opts.Source, t.root)
 		}
 		objectTypes[ot] = info
@@ -104,9 +109,24 @@ func (c *Client) createAndActivateXML(ctx context.Context, op string, ot Creatab
 		return objURL, fmt.Errorf("%s: %s created, activation: %w", op, name, err)
 	}
 	if !res.Success {
+		// Authorization fields (and other IAM form objects) are saved active
+		// by the POST itself; ADT then refuses a separate activation without a
+		// message (HL8, 2026-09-28). Trust the document when it is not inactive.
+		if len(res.ProblemLines()) == 0 && c.xmlObjectNotInactive(ctx, objURL) {
+			return objURL, nil
+		}
 		return objURL, fmt.Errorf("%s: %s created but did not activate: %s (check GetInactiveObjects — SAP sometimes reports a false failure)", op, name, strings.Join(res.ProblemLines(), "; "))
 	}
 	return objURL, nil
+}
+
+// xmlObjectNotInactive reports whether the object's ADT document exists and is not flagged inactive.
+func (c *Client) xmlObjectNotInactive(ctx context.Context, objURL string) bool {
+	resp, err := c.transport.Request(ctx, objURL, &RequestOptions{Method: http.MethodGet, Accept: "*/*"})
+	if err != nil {
+		return false
+	}
+	return !strings.Contains(string(resp.Body), `adtcore:version="inactive"`)
 }
 
 // AuthFieldOptions describes an authorization field (AUTH).
@@ -224,27 +244,66 @@ func ibsTypeOf(id string) (string, string) {
 }
 
 func buildCommScenarioContent(name string, ibs []string) string {
+	// Element order is a strict XML sequence (ADT answers 500 "System expected
+	// the element …obOAuth2MultiConfig" when one is skipped) — mirrored from
+	// ZCS_DEMO_PC on HL8, 2026-09-28, with the wizard's defaults.
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf(`  <sco1:content>
+    <sco1:publishIndicator>false</sco1:publishIndicator>
+    <sco1:abapLanguageVersion>5</sco1:abapLanguageVersion>
     <sco1:communicationScenarioID>%s</sco1:communicationScenarioID>
     <sco1:communicationScenarioType>1</sco1:communicationScenarioType>
     <sco1:scopeDependent>false</sco1:scopeDependent>
+    <sco1:scopeStatus>3</sco1:scopeStatus>
+    <sco1:scopeStatusText/>
+    <sco1:containsInbound>%t</sco1:containsInbound>
+    <sco1:containsOutbound>false</sco1:containsOutbound>
     <sco1:allowedInstances>1</sco1:allowedInstances>
+    <sco1:badiClassDeploy/>
+    <sco1:badiClassRuntime/>
+    <sco1:allowCreateByKey>false</sco1:allowCreateByKey>
     <sco1:ibBasicAuth>true</sco1:ibBasicAuth>
     <sco1:ibX509Auth>true</sco1:ibX509Auth>
     <sco1:ibOAuth2Auth>false</sco1:ibOAuth2Auth>
+    <sco1:ibTrustPseID>SSLC_CUSTOMER_DEFAULT</sco1:ibTrustPseID>
+    <sco1:ibSignPseID/>
+    <sco1:ibEncryptPseID/>
+    <sco1:ibRoleID/>
+    <sco1:ibSapManagedUserName/>
+    <sco1:dbmsUserRequired>false</sco1:dbmsUserRequired>
+    <sco1:obNoneAuth>false</sco1:obNoneAuth>
+    <sco1:obBasicAuth>true</sco1:obBasicAuth>
+    <sco1:obX509Auth>true</sco1:obX509Auth>
+    <sco1:obOAuth1Auth>false</sco1:obOAuth1Auth>
+    <sco1:obOAuth2Auth>false</sco1:obOAuth2Auth>
+    <sco1:obTrustPseID>SSLC_CUSTOMER_DEFAULT</sco1:obTrustPseID>
+    <sco1:obSignPseID/>
+    <sco1:obEncryptPseID/>
+    <sco1:obAuthPseID>SSLC_CUSTOMER_DEFAULT</sco1:obAuthPseID>
+    <sco1:obOAuth2MultiConfig>false</sco1:obOAuth2MultiConfig>
+    <sco1:obOAuth2ClientProfile>SAP_APS_COM_A4C_CSCN_SCP</sco1:obOAuth2ClientProfile>
+    <sco1:obOAuth2GrantType>0</sco1:obOAuth2GrantType>
+    <sco1:obOAuth2TargetPath/>
+    <sco1:rootProperties/>
     <sco1:inboundServices>
-`, escapeXML(name)))
-	for i, id := range ibs {
+`, escapeXML(name), len(ibs) > 0))
+	n := 0
+	for _, id := range ibs {
 		id = strings.ToUpper(strings.TrimSpace(id))
 		if id == "" {
 			continue
 		}
+		n++
 		t, txt := ibsTypeOf(id)
-		b.WriteString(fmt.Sprintf("      <sco1:inboundService><sco1:inboundID>%04d</sco1:inboundID><sco1:ibsID>%s</sco1:ibsID><sco1:ibsType>%s</sco1:ibsType><sco1:ibsTypeText>%s</sco1:ibsTypeText></sco1:inboundService>\n",
-			i+1, escapeXML(id), t, txt))
+		b.WriteString(fmt.Sprintf("      <sco1:inboundService><sco1:inboundID>%04d</sco1:inboundID><sco1:ibsID>%s</sco1:ibsID><sco1:ibsType>%s</sco1:ibsType><sco1:ibsTypeText>%s</sco1:ibsTypeText><sco1:text/><sco1:isHidden>false</sco1:isHidden><sco1:partnerType/><sco1:partnerRole/><sco1:messageCode/><sco1:messageFunction/><sco1:processCode/><sco1:triggerImmediately>false</sco1:triggerImmediately><sco1:srvcType>HT</sco1:srvcType><sco1:srvcName/></sco1:inboundService>\n",
+			n, escapeXML(id), t, txt))
 	}
-	b.WriteString("    </sco1:inboundServices>\n    <sco1:outboundServices/>\n  </sco1:content>")
+	b.WriteString(`    </sco1:inboundServices>
+    <sco1:inboundServiceProperties/>
+    <sco1:outboundServices/>
+    <sco1:outboundServiceProperties/>
+    <commonAuthorization:auths xmlns:commonAuthorization="http://www.sap.com/aps/common/authorization"/>
+  </sco1:content>`)
 	return b.String()
 }
 

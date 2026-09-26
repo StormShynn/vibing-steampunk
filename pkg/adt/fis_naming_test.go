@@ -1,6 +1,7 @@
 package adt
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -11,7 +12,7 @@ func TestCheckNamingRule(t *testing.T) {
 		{"TABL/DT", "ZTB_AP_PAYDOC"}, {"TABL/DS", "ZST_ADMIN_DATA"}, {"DDLS/DF", "ZR_PAYDOCTP"},
 		{"DDLX/EX", "ZC_PAYDOCTP"}, {"DCLS/DL", "ZR_PAYDOCTP"}, {"DTEL/DE", "ZDE_AP_AMOUNT"},
 		{"DOMA/DD", "ZDO_AP_STATUS"}, {"MSAG/N", "ZMS_AP"}, {"SRVB/SVB", "ZUI_AP_PAYDOC_O4"},
-		{"SUSO/B", "Z_AP_PAY"}, {"NROB/NRO", "ZNR_PAYDOC"}, {"APLO/TYP", "ZAL_AP"}, {"SAJC", "ZAJC_AP_SEND"},
+		{"SUSO/B", "ZAU_APPAY"}, {"NROB/NRO", "ZNR_PAYDOC"}, {"APLO/TYP", "ZAL_AP"}, {"SAJC", "ZAJC_AP_SEND"},
 		{"SAJT", "ZAJT_AP_SEND"}, {"ENHO/XHB", "ZEI_MM_SLOC"}, {"SIA7/AS", "anything"}, {"PROG/P", "ZANY"},
 		{"CLAS/OC", "ZCL_FISST_0927"}, {"MSAG/N", "ZMS_FISST0927"}, {"TABL/DT", "ZTB_FISST_JL0927"}, {"CLAS/OC", "/ABC/CL_X"},
 	}
@@ -29,6 +30,16 @@ func TestCheckNamingRule(t *testing.T) {
 		if err := checkNamingRule(c[0], c[1]); err == nil {
 			t.Errorf("%s %s: expected refusal", c[0], c[1])
 		}
+	}
+}
+
+func TestTableAlwaysZTB(t *testing.T) {
+	var c *Client // strict rule returns before any tenant search
+	if err := c.checkFISNaming(context.Background(), "TABL/DT", "ZBT3_FS0928"); err == nil {
+		t.Fatal("ZBT3_ table accepted, want refusal")
+	}
+	if err := c.checkFISNaming(context.Background(), "TABL/DT", "ZTB_FI_PAYDOC"); err != nil {
+		t.Fatalf("ZTB_FI_PAYDOC: %v", err)
 	}
 }
 
