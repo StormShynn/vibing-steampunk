@@ -36,6 +36,8 @@ type serverDrivenType struct {
 	maxName    int
 }
 
+// SUSO / AUTH / SCO1 / ENHO are XML documents, not JSON: see fis_xml_objects.go.
+//
 // serverDrivenTypes whitelists the collections. Types marked [Unverified] have
 // their URI read from HL8 (SearchObject) but their document not yet — they may
 // not be JSON-based at all — pass the JSON the
@@ -46,9 +48,6 @@ var serverDrivenTypes = map[string]serverDrivenType{
 	"NROB": {"/sap/bc/adt/numberranges/objects", "NROB/NRO", 10},
 	"APLO": {"/sap/bc/adt/applicationlog/objects", "APLO/TYP", 20},
 	"CHDO": {"/sap/bc/adt/changedocuments/objects", "CHDO/CHD", 15}, // [Unverified] JSON
-	"SUSO": {"/sap/bc/adt/aps/iam/suso", "SUSO/B", 10},              // [Unverified] JSON
-	"AUTH": {"/sap/bc/adt/aps/iam/auth", "AUTH", 10},                // [Unverified] JSON
-	"SCO1": {"/sap/bc/adt/aps/cloud/com/sco1", "SCO1", 30},          // [Unverified] JSON
 }
 
 // serverDrivenShellTypes: blues v2 (SAJC/SAJT verified), then v1 (what NROB/APLO serve).

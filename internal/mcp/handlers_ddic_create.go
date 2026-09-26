@@ -229,3 +229,76 @@ func (s *Server) handleCreateApplicationLogObject(ctx context.Context, req mcp.C
 		"subobjects": len(o.Subobjects)}, "", "  ")
 	return mcp.NewToolResultText(string(out)), nil
 }
+
+func argStringList(req mcp.CallToolRequest, k string) []string {
+	raw := strings.TrimSpace(argString(req, k))
+	if raw == "" {
+		return nil
+	}
+	if strings.HasPrefix(raw, "[") {
+		var out []string
+		if json.Unmarshal([]byte(raw), &out) == nil {
+			return out
+		}
+	}
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func createdResult(kind, name, objURL string, extra map[string]any) *mcp.CallToolResult {
+	m := map[string]any{"status": "created", "type": kind, "name": strings.ToUpper(name), "objectUrl": objURL}
+	for k, v := range extra {
+		m[k] = v
+	}
+	out, _ := json.MarshalIndent(m, "", "  ")
+	return mcp.NewToolResultText(string(out))
+}
+
+func (s *Server) handleCreateAuthorizationField(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.AuthFieldOptions{Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"), DataElement: argString(req, "data_element")}
+	u, err := s.adtClient.CreateAuthorizationField(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return createdResult("AUTH", o.Name, u, nil), nil
+}
+
+func (s *Server) handleCreateAuthorizationObject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.AuthObjectOptions{Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"),
+		Fields: argStringList(req, "fields"), Activities: argStringList(req, "activities"), NoActivity: argBool(req, "no_activity")}
+	u, err := s.adtClient.CreateAuthorizationObject(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return createdResult("SUSO", o.Name, u, map[string]any{"next": "an IAM app / restriction type exposes it to business roles (SIA2/SIA5 in ADT)"}), nil
+}
+
+func (s *Server) handleCreateCommunicationScenario(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.CommScenarioOptions{Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"), InboundServices: argStringList(req, "inbound_services")}
+	u, err := s.adtClient.CreateCommunicationScenario(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return createdResult("SCO1", o.Name, u, map[string]any{"next": "publish locally in ADT (Publish Locally) before an admin creates the communication arrangement"}), nil
+}
+
+func (s *Server) handleCreateBAdIImplementation(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.BAdIImplOptions{Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"),
+		EnhancementSpot: argString(req, "enhancement_spot"), BAdIDefinition: argString(req, "badi_definition"),
+		ImplementationName: argString(req, "implementation_name"), ImplementingClass: argString(req, "implementing_class"),
+		Example: argBool(req, "example"), Default: argBool(req, "default")}
+	u, err := s.adtClient.CreateBAdIImplementation(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return createdResult("ENHO", o.Name, u, nil), nil
+}

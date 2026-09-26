@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode/utf8"
 )
 
 // --- i18n Types ---
@@ -231,6 +232,11 @@ func (c *Client) WriteMessageClassTexts(ctx context.Context, name, lang string, 
 		XMLNSadtcore: "http://www.sap.com/adt/core",
 		Name:         name,
 	}
+	// The PUT replaces the whole document: without the description the class
+	// lost its short text on every text write (seen on HL8, 2026-09-27).
+	if cur, gerr := c.GetMessageClass(ctx, name); gerr == nil {
+		mc.Description = cur.Description
+	}
 	for _, t := range texts {
 		mc.Messages = append(mc.Messages, messageWrite{Number: t.Number, Text: t.Text})
 	}
@@ -283,32 +289,62 @@ func (c *Client) WriteDataElementLabels(ctx context.Context, name, lang string, 
 		return err
 	}
 
-	// This marshalled the read model straight to XML and PUT it as
-	// application/xml. Neither half of that is the resource: what ADT serves
-	// and takes at this address is a blue:wbobj document carrying the whole
-	// data element — domain, type, lengths, a dozen flags — with the labels as
-	// dtel:*FieldLabel children, under the versioned vocabulary type. A
-	// four-field document is not a subset of it; it is a different document,
-	// and a PUT of one would either be rejected or, worse, accepted as a
-	// replacement for everything the element has.
-	//
-	// The reader beside this was broken in exactly the same way and could be
-	// fixed, because reading is verifiable against a live system without
-	// changing it. This cannot: the only way to know what the resource accepts
-	// is to write, and a guess that turns out to be a whole-object replacement
-	// costs the object.
-	//
-	// So it refuses, and says what the fix is rather than pretending the fix is
-	// in. The correct implementation is read-modify-write — GET the current
-	// document, substitute the four labels, PUT it back under the same
-	// Content-Type — and it needs a scratch data element on a system somebody
-	// is willing to have written to.
-	_ = labels
-	_ = lockHandle
-	return fmt.Errorf("writing data element labels is not implemented: the request this used to send " +
-		"was a four-field document at a resource that takes the element's whole representation, so it " +
-		"could not have worked; use SE11 for now, or see WriteDataElementLabels for what a correct " +
-		"implementation has to do")
+	// Read-modify-write (FIS, verified shape: fix-6 CreateDataElement writes the
+	// same document): GET the element's whole blue:wbobj document in the target
+	// language, substitute only the four labels (and their lengths), PUT it back
+	// under the same media type with the caller's lock.
+	if labels == nil {
+		return fmt.Errorf("WriteDataElementLabels: no labels given")
+	}
+	objURL := dtelCollection + "/" + url.PathEscape(strings.ToLower(name))
+	resp, err := c.transport.Request(ctx, objURL, &RequestOptions{
+		Method: http.MethodGet, Accept: dtelContentType, Stateful: true, OverrideLanguage: lang,
+	})
+	if err != nil {
+		return fmt.Errorf("WriteDataElementLabels: reading %s: %w", name, err)
+	}
+	doc, err := editDataElementLabelsDoc(string(resp.Body), labels)
+	if err != nil {
+		return fmt.Errorf("WriteDataElementLabels: %w", err)
+	}
+	put := url.Values{}
+	put.Set("lockHandle", lockHandle)
+	if transport != "" {
+		put.Set("corrNr", transport)
+	}
+	if _, err := c.transport.Request(ctx, objURL, &RequestOptions{
+		Method: http.MethodPut, Query: put, Body: []byte(doc),
+		ContentType: dtelContentType, Accept: dtelContentType, Stateful: true, OverrideLanguage: lang,
+	}); err != nil {
+		return fmt.Errorf("WriteDataElementLabels: writing %s: %w", name, err)
+	}
+	return nil
+}
+
+// editDataElementLabelsDoc replaces only the label elements of a data element document.
+func editDataElementLabelsDoc(doc string, l *DataElementLabels) (string, error) {
+	limits := map[string]int{"shortField": 10, "mediumField": 20, "longField": 40, "headingField": 55}
+	n := 0
+	for _, f := range []struct{ tag, val string }{
+		{"shortField", l.Short}, {"mediumField", l.Medium}, {"longField", l.Long}, {"headingField", l.Heading},
+	} {
+		if f.val == "" {
+			continue
+		}
+		if utf8.RuneCountInString(f.val) > limits[f.tag] {
+			return "", fmt.Errorf("%s label longer than %d characters", f.tag, limits[f.tag])
+		}
+		var ok bool
+		if doc, ok = setElem(doc, "dtel:"+f.tag+"Label", f.val); !ok {
+			return "", fmt.Errorf("element dtel:%sLabel not found in the server document", f.tag)
+		}
+		doc, _ = setElem(doc, "dtel:"+f.tag+"Length", fmt.Sprintf("%02d", utf8.RuneCountInString(f.val)))
+		n++
+	}
+	if n == 0 {
+		return "", fmt.Errorf("no labels given")
+	}
+	return doc, nil
 }
 
 // GetTextPoolInLanguage retrieves the text pool (text elements/symbols) of a program in a specific language.
@@ -460,6 +496,7 @@ type messageClassWrite struct {
 	XMLNSmc      string         `xml:"xmlns:mc,attr"`
 	XMLNSadtcore string         `xml:"xmlns:adtcore,attr"`
 	Name         string         `xml:"adtcore:name,attr"`
+	Description  string         `xml:"adtcore:description,attr,omitempty"`
 	Messages     []messageWrite `xml:"mc:messages"`
 }
 

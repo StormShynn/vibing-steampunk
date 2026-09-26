@@ -80,7 +80,7 @@ func fisObjectURL(objectType CreatableObjectType, name string) string {
 	case ObjectTypeMessageClass:
 		return "/sap/bc/adt/messageclass/" + lower
 	}
-	return ""
+	return fisXMLObjectURL(objectType, name)
 }
 
 // fisSourceTypeFor returns the ADT type for a WriteSource code (DDLX, DCLS, STRU).

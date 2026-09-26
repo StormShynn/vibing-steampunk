@@ -1192,8 +1192,8 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 
 	if shouldRegister("CreateServerDrivenObject") {
 		s.mcpServer.AddTool(mcp.NewTool("CreateServerDrivenObject",
-			mcp.WithDescription("Create and activate a server-driven ADT object (blue shell + JSON source, the form editors in ADT): NROB number range object, APLO application log object, SAJC/SAJT job catalog/template, and — document format not yet verified — CHDO, SUSO, AUTH, SCO1. Read an existing object's JSON with GetADTObjectXML(<uri>/source/main) first and pass the same shape; header is filled in when missing."),
-			mcp.WithString("object_type", mcp.Required(), mcp.Description("NROB | APLO | SAJC | SAJT | CHDO | SUSO | AUTH | SCO1")),
+			mcp.WithDescription("Create and activate a server-driven ADT object (blue shell + JSON source, the form editors in ADT): NROB number range object, APLO application log object, SAJC/SAJT job catalog/template, and — document format not yet verified — CHDO. Authorization objects/fields, communication scenarios and BAdI implementations have their own tools. Read an existing object's JSON with GetADTObjectXML(<uri>/source/main) first and pass the same shape; header is filled in when missing."),
+			mcp.WithString("object_type", mcp.Required(), mcp.Description("NROB | APLO | SAJC | SAJT | CHDO")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Object name (Z/Y)")),
 			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
 			mcp.WithString("json_source", mcp.Description("JSON content document (without header is fine)")),
@@ -1227,6 +1227,57 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
 			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
 		), s.handleCreateApplicationLogObject)
+	}
+
+	if shouldRegister("CreateAuthorizationField") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateAuthorizationField",
+			mcp.WithDescription("Create and activate an authorization field (AUTH) typed by a data element."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Field name (Z/Y, max 10)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("data_element", mcp.Required(), mcp.Description("Data element typing the field")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateAuthorizationField)
+	}
+
+	if shouldRegister("CreateAuthorizationObject") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateAuthorizationObject",
+			mcp.WithDescription("Create and activate an authorization object (SUSO, class CPAE) with ACTVT plus the given fields, for AUTHORITY-CHECK / DCL pfcg_auth."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Authorization object (Z/Y, max 10)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("fields", mcp.Required(), mcp.Description("Authorization fields besides ACTVT, comma separated or JSON array (e.g. BUKRS or a Z field)")),
+			mcp.WithString("activities", mcp.Description("ACTVT codes, default 01,02,03,06")),
+			mcp.WithBoolean("no_activity", mcp.Description("Object without ACTVT")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateAuthorizationObject)
+	}
+
+	if shouldRegister("CreateCommunicationScenario") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateCommunicationScenario",
+			mcp.WithDescription("Create and activate a customer communication scenario (SCO1), optionally with inbound services (IDs generated when an API service binding is published, e.g. ZAPI_X_O4_0001_G4BA)."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Scenario ID (Z/Y, max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("inbound_services", mcp.Description("Inbound service IDs, comma separated or JSON array")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateCommunicationScenario)
+	}
+
+	if shouldRegister("CreateBAdIImplementation") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateBAdIImplementation",
+			mcp.WithDescription("Create and activate an enhancement implementation (ENHO) with one BAdI implementation for a released cloud BAdI. Create the implementing class (INTERFACES <BAdI interface>) first."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Enhancement implementation (Z/Y, max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("enhancement_spot", mcp.Required(), mcp.Description("Enhancement spot, e.g. MMIM_CLOUD_BADI")),
+			mcp.WithString("badi_definition", mcp.Required(), mcp.Description("BAdI definition, e.g. MMIM_ITEM_CHECK_DATA")),
+			mcp.WithString("implementing_class", mcp.Required(), mcp.Description("Class implementing the BAdI interface")),
+			mcp.WithString("implementation_name", mcp.Description("BAdI implementation name (default: name)")),
+			mcp.WithBoolean("example", mcp.Description("Example implementation (default false)")),
+			mcp.WithBoolean("default", mcp.Description("Default implementation (default false)")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateBAdIImplementation)
 	}
 
 	if shouldRegister("RunClass") {

@@ -37,7 +37,7 @@ Two modes of operation:
 
   MCP Server (default)  Connects Claude, Gemini CLI, Copilot, Codex, Qwen Code,
                         and other MCP-compatible agents to SAP systems.
-                        111 tools (focused), 162 (expert), or 1 universal tool (hyperfocused).
+                        115 tools (focused), 166 (expert), or 1 universal tool (hyperfocused).
 
   CLI Mode              Direct terminal access: search, source, export, debug.
                         Multi-system profiles. Useful for scripts and pipelines.
@@ -147,7 +147,7 @@ func init() {
 	rootCmd.Flags().StringVar(&cfg.TransportChoice, "transport-choice", "auto", "A write with no transport named: auto picks the object's own or an open request of yours that fits (and creates one with --enable-transports); off leaves it to SAP, which generates a request per write")
 
 	// Mode options
-	rootCmd.Flags().StringVar(&cfg.Mode, "mode", "hyperfocused", "Tool mode: hyperfocused (single universal SAP tool), focused (111 tools), or expert (162 tools)")
+	rootCmd.Flags().StringVar(&cfg.Mode, "mode", "hyperfocused", "Tool mode: hyperfocused (single universal SAP tool), focused (115 tools), or expert (166 tools)")
 	rootCmd.Flags().StringVar(&cfg.DisabledGroups, "disabled-groups", "", "Disable tool groups: 5/U=UI5, T=Tests, H=HANA, D=Debug, GC=gCTS, N=i18n")
 
 	// Transport options
