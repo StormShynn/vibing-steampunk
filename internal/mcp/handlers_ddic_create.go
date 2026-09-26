@@ -69,6 +69,16 @@ func (s *Server) handleCreateDomain(ctx context.Context, req mcp.CallToolRequest
 		Decimals: argInt(req, "decimals"), OutputLen: argInt(req, "output_length"),
 		Lowercase: argBool(req, "lowercase"),
 	}
+	if raw, ok := req.GetArguments()["fixed_values"].([]any); ok {
+		for i, it := range raw {
+			m, ok := it.(map[string]any)
+			if !ok {
+				return newToolResultError(fmt.Sprintf("fixed_values[%d] must be an object {low, high, text}", i)), nil
+			}
+			str := func(k string) string { v, _ := m[k].(string); return v }
+			o.FixedValues = append(o.FixedValues, adt.DomainFixedValue{Low: str("low"), High: str("high"), Text: str("text")})
+		}
+	}
 	if o.Name == "" || o.Description == "" {
 		return newToolResultError("name and description are required"), nil
 	}
@@ -77,7 +87,7 @@ func (s *Server) handleCreateDomain(ctx context.Context, req mcp.CallToolRequest
 		return newToolResultError(err.Error()), nil
 	}
 	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": o.Name, "objectUrl": objURL, "package": o.Package,
-		"note": "fixed values are not set by this tool - add them in ADT"}, "", "  ")
+		"fixedValues": len(o.FixedValues)}, "", "  ")
 	return mcp.NewToolResultText(string(out)), nil
 }
 

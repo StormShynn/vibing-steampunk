@@ -1116,7 +1116,7 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 
 	if shouldRegister("CreateDomain") {
 		s.mcpServer.AddTool(mcp.NewTool("CreateDomain",
-			mcp.WithDescription("Create and activate a DDIC domain (data type, length, decimals, output length, lowercase). Fixed values are not set - add them in ADT."),
+			mcp.WithDescription("Create and activate a DDIC domain (data type, length, decimals, output length, lowercase, fixed values)."),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Domain name (Z/Y, max 30)")),
 			mcp.WithString("description", mcp.Required(), mcp.Description("Short description")),
 			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
@@ -1126,6 +1126,18 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 			mcp.WithNumber("decimals", mcp.Description("Decimals (default 0)")),
 			mcp.WithNumber("output_length", mcp.Description("Output length (default: length, +1 with decimals)")),
 			mcp.WithBoolean("lowercase", mcp.Description("Allow lower-case values")),
+			mcp.WithArray("fixed_values",
+				mcp.Description(`Fixed values, in order: [{"low":"01","text":"Open"},{"low":"02","text":"Closed"}]; high = interval upper bound`),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"low":  map[string]any{"type": "string", "description": "Value (or interval lower bound)"},
+						"high": map[string]any{"type": "string", "description": "Interval upper bound (optional)"},
+						"text": map[string]any{"type": "string", "description": "Short text, max 60"},
+					},
+					"required": []string{"low", "text"},
+				}),
+			),
 		), s.handleCreateDomain)
 	}
 
