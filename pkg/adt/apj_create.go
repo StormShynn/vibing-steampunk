@@ -199,6 +199,13 @@ func (c *Client) blueJSONCreate(ctx context.Context, opName, collection, adtType
 		return objURL, fmt.Errorf("%s: unlocking %s: %w — %s", opName, name, err, strandedLockAdvice(objURL, err))
 	}
 	activation, err := c.Activate(ctx, objURL, name)
+	if err == nil && !activation.Success {
+		// Seen on HL8 (2026-09-26) for both SAJC and SAJT: the first activation
+		// right after the content PUT reports the referenced class / catalog as
+		// empty ("Report or class  is invalid", "Job catalog entry  doesn't
+		// exist"), a second activation of the same object succeeds.
+		activation, err = c.Activate(ctx, objURL, name)
+	}
 	if err != nil {
 		return objURL, fmt.Errorf("%s: activating %s: %w", opName, name, err)
 	}
