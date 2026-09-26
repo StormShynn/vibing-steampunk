@@ -134,13 +134,16 @@ func (c *Client) GetSource(ctx context.Context, objectType, name string, opts *G
 		}
 		return string(data), nil
 
+	case "DDLX", "DCLS", "STRU":
+		return c.getFISSource(ctx, objectType, name)
+
 	case "ENHO":
 		// Enhancement Framework implementation — read via the ADT enhancement
 		// endpoints (see enhancements.go).
 		return c.GetEnhancement(ctx, name)
 
 	default:
-		return "", fmt.Errorf("unsupported object type: %s (supported: PROG, CLAS, INTF, FUNC, FUGR, INCL, DDLS, VIEW, BDEF, SRVD, SRVB, MSAG, ENHO)", objectType)
+		return "", fmt.Errorf("unsupported object type: %s (supported: PROG, CLAS, INTF, FUNC, FUGR, INCL, DDLS, DDLX, DCLS, STRU, VIEW, BDEF, SRVD, SRVB, MSAG, ENHO)", objectType)
 	}
 }
 
@@ -269,10 +272,10 @@ func (c *Client) WriteSource(ctx context.Context, objectType, name, source strin
 
 	// Validate object type
 	switch objectType {
-	case "PROG", "CLAS", "INTF", "INCL", "DDLS", "BDEF", "SRVD", "SRVB", "TABL":
+	case "PROG", "CLAS", "INTF", "INCL", "DDLS", "BDEF", "SRVD", "SRVB", "TABL", "DDLX", "DCLS", "STRU":
 		// Supported types
 	default:
-		result.Message = fmt.Sprintf("Unsupported object type: %s (supported: PROG, CLAS, INTF, FUNC, INCL, DDLS, BDEF, SRVD, SRVB, TABL)", objectType)
+		result.Message = fmt.Sprintf("Unsupported object type: %s (supported: PROG, CLAS, INTF, FUNC, INCL, DDLS, DDLX, DCLS, STRU, BDEF, SRVD, SRVB, TABL)", objectType)
 		return result, nil
 	}
 
@@ -313,6 +316,8 @@ func (c *Client) WriteSource(ctx context.Context, objectType, name, source strin
 			_, probeErr = c.GetSRVB(ctx, name)
 		case "TABL":
 			_, probeErr = c.GetTable(ctx, name)
+		case "DDLX", "DCLS", "STRU":
+			_, probeErr = c.getFISSource(ctx, objectType, name)
 		default:
 			// No existence probe is known for this type, so upsert has nothing
 			// to decide on. Leaving it at "does not exist" is how the previous
@@ -604,10 +609,14 @@ func (c *Client) writeSourceCreate(ctx context.Context, objectType, name, source
 
 		return result, nil
 
-	case "DDLS", "BDEF", "SRVD":
+	case "DDLS", "BDEF", "SRVD", "DDLX", "DCLS", "STRU":
 		// Get object type and URL
 		var objType CreatableObjectType
 		var objectURL string
+		if ft, ok := fisSourceTypeFor(objectType); ok {
+			objType = ft.objType
+			objectURL = GetObjectURL(ft.objType, name, "")
+		}
 		switch objectType {
 		case "DDLS":
 			objType = ObjectTypeDDLS
@@ -1073,9 +1082,12 @@ func (c *Client) writeSourceUpdate(ctx context.Context, objectType, name, source
 
 		return result, nil
 
-	case "DDLS", "BDEF", "SRVD", "TABL":
+	case "DDLS", "BDEF", "SRVD", "TABL", "DDLX", "DCLS", "STRU":
 		// Get object URL
 		var objectURL string
+		if ft, ok := fisSourceTypeFor(objectType); ok {
+			objectURL = GetObjectURL(ft.objType, name, "")
+		}
 		switch objectType {
 		case "DDLS":
 			objectURL = GetObjectURL(ObjectTypeDDLS, name, "")

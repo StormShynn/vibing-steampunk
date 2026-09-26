@@ -1178,6 +1178,57 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 		), s.handleCreateJobTemplate)
 	}
 
+	if shouldRegister("CreateMessageClass") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateMessageClass",
+			mcp.WithDescription("Create a message class (MSAG) and optionally write its messages in one call."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Message class name (Z/Y, max 20)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Short description")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+			mcp.WithString("messages", mcp.Description("Optional JSON array [{\"number\":\"001\",\"text\":\"... &1 ...\"}] (text max 73)")),
+			mcp.WithString("language", mcp.Description("Language of the texts (default: logon language)")),
+		), s.handleCreateMessageClass)
+	}
+
+	if shouldRegister("CreateServerDrivenObject") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateServerDrivenObject",
+			mcp.WithDescription("Create and activate a server-driven ADT object (blue shell + JSON source, the form editors in ADT): NROB number range object, APLO application log object, SAJC/SAJT job catalog/template, and — document format not yet verified — CHDO, SUSO, AUTH, SCO1. Read an existing object's JSON with GetADTObjectXML(<uri>/source/main) first and pass the same shape; header is filled in when missing."),
+			mcp.WithString("object_type", mcp.Required(), mcp.Description("NROB | APLO | SAJC | SAJT | CHDO | SUSO | AUTH | SCO1")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Object name (Z/Y)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("json_source", mcp.Description("JSON content document (without header is fine)")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateServerDrivenObject)
+	}
+
+	if shouldRegister("CreateNumberRangeObject") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateNumberRangeObject",
+			mcp.WithDescription("Create a number range object (NROB) through ADT, with object directory entry so it can be transported. Intervals are runtime data: create them with CL_NUMBERRANGE_INTERVALS=>create (RunClass) or the app Manage Number Range Intervals."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Number range object (Z/Y, max 10)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("domain", mcp.Required(), mcp.Description("Number length domain (e.g. a NUMC10 domain)")),
+			mcp.WithNumber("percent_warning", mcp.Description("Warning when this percentage of the interval is left (default 10)")),
+			mcp.WithBoolean("rolling", mcp.Description("Restart at the start of the interval when exhausted")),
+			mcp.WithBoolean("until_year", mcp.Description("Intervals per fiscal year")),
+			mcp.WithString("buffering", mcp.Description("Buffering, default mainBuffer")),
+			mcp.WithNumber("buffered_numbers", mcp.Description("Numbers in buffer (default 1)")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateNumberRangeObject)
+	}
+
+	if shouldRegister("CreateApplicationLogObject") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateApplicationLogObject",
+			mcp.WithDescription("Create an application log object (APLO) with subobjects, for cl_bali_log."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Log object (Z/Y, max 20)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("subobjects", mcp.Description("JSON array [{\"name\":\"PAYSEND\",\"description\":\"...\"}]")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateApplicationLogObject)
+	}
+
 	if shouldRegister("RunClass") {
 		s.mcpServer.AddTool(mcp.NewTool("RunClass",
 			mcp.WithDescription("Run a class that implements IF_OO_ADT_CLASSRUN (same as F9 in Eclipse ADT) and return its console output. Executes code on the system: blocked in read-only mode; the class must be in an allowed package. Use only for classes you wrote for the task (setup, test data, diagnostics)."),

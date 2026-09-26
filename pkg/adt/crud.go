@@ -306,6 +306,8 @@ type objectTypeInfo struct {
 	// their own file, so a new type is additive rather than another branch in
 	// buildCreateObjectBody.
 	bodyBuilder func(opts CreateObjectOptions, typeInfo objectTypeInfo, responsible string) string
+	// contentType, when set, is the media type of the create POST (default application/*).
+	contentType string
 }
 
 var objectTypes = map[CreatableObjectType]objectTypeInfo{
@@ -744,6 +746,9 @@ func (c *Client) CreateObject(ctx context.Context, opts CreateObjectOptions) err
 	if opts.ObjectType == ObjectTypeBDEF {
 		contentType = "application/vnd.sap.adt.blues.v1+xml"
 	}
+	if typeInfo.contentType != "" {
+		contentType = typeInfo.contentType
+	}
 
 	// First attempt
 	_, err := c.transport.Request(ctx, creationURL, &RequestOptions{
@@ -1044,7 +1049,7 @@ func GetObjectURL(objectType CreatableObjectType, name string, parentName string
 	case ObjectTypeSRVB:
 		return fmt.Sprintf("/sap/bc/adt/businessservices/bindings/%s", url.PathEscape(strings.ToLower(name)))
 	default:
-		return ""
+		return fisObjectURL(objectType, name)
 	}
 }
 

@@ -157,3 +157,75 @@ func (s *Server) handleCreateJobTemplate(ctx context.Context, req mcp.CallToolRe
 	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": o.Name, "objectUrl": objURL, "package": o.Package}, "", "  ")
 	return mcp.NewToolResultText(string(out)), nil
 }
+
+func (s *Server) handleCreateMessageClass(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.MessageClassOptions{
+		Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"), Language: argString(req, "language"),
+	}
+	if raw := argString(req, "messages"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &o.Messages); err != nil {
+			return newToolResultError(fmt.Sprintf("messages must be a JSON array of {\"number\":\"001\",\"text\":\"...\"}: %v", err)), nil
+		}
+	}
+	objURL, err := s.adtClient.CreateMessageClass(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": strings.ToUpper(o.Name), "objectUrl": objURL,
+		"messages": len(o.Messages)}, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
+
+func (s *Server) handleCreateServerDrivenObject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.ServerDrivenOptions{
+		Type: argString(req, "object_type"), Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"), JSON: argString(req, "json_source"),
+	}
+	objURL, err := s.adtClient.CreateServerDrivenObject(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out, _ := json.MarshalIndent(map[string]any{"status": "created", "type": strings.ToUpper(o.Type),
+		"name": strings.ToUpper(o.Name), "objectUrl": objURL}, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
+
+func (s *Server) handleCreateNumberRangeObject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pw := 0.0
+	if v, ok := req.GetArguments()["percent_warning"].(float64); ok {
+		pw = v
+	}
+	o := adt.NumberRangeObjectOptions{
+		Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"),
+		Domain: argString(req, "domain"), PercentWarning: pw, Rolling: argBool(req, "rolling"),
+		UntilYear: argBool(req, "until_year"), Buffering: argString(req, "buffering"), BufferedNumbers: argInt(req, "buffered_numbers"),
+	}
+	objURL, err := s.adtClient.CreateNumberRangeObject(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": strings.ToUpper(o.Name), "objectUrl": objURL,
+		"next": "create intervals at runtime: CL_NUMBERRANGE_INTERVALS=>create (RunClass) or app Manage Number Range Intervals"}, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
+
+func (s *Server) handleCreateApplicationLogObject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.ApplicationLogObjectOptions{
+		Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"),
+	}
+	if raw := argString(req, "subobjects"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &o.Subobjects); err != nil {
+			return newToolResultError(fmt.Sprintf("subobjects must be a JSON array of {\"name\":\"...\",\"description\":\"...\"}: %v", err)), nil
+		}
+	}
+	objURL, err := s.adtClient.CreateApplicationLogObject(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out, _ := json.MarshalIndent(map[string]any{"status": "created", "name": strings.ToUpper(o.Name), "objectUrl": objURL,
+		"subobjects": len(o.Subobjects)}, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}

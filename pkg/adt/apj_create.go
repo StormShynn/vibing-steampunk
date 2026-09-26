@@ -155,6 +155,12 @@ func (c *Client) CreateJobTemplate(ctx context.Context, o JobTemplateOptions) (s
 
 // blueJSONCreate: POST blue shell -> LOCK -> PUT JSON source -> UNLOCK -> ACTIVATE.
 func (c *Client) blueJSONCreate(ctx context.Context, opName, collection, adtType, name, description, pkg, transport string, source []byte) (string, error) {
+	return c.blueJSONCreateCT(ctx, opName, collection, adtType, name, description, pkg, transport, source, []string{bluesV2ContentType})
+}
+
+// blueJSONCreateCT is blueJSONCreate with a list of shell media types, tried in
+// order while SAP answers that the media type is not accepted.
+func (c *Client) blueJSONCreateCT(ctx context.Context, opName, collection, adtType, name, description, pkg, transport string, source []byte, shellTypes []string) (string, error) {
 	if pkg == "" {
 		pkg = "$TMP"
 	}
@@ -167,11 +173,18 @@ func (c *Client) blueJSONCreate(ctx context.Context, opName, collection, adtType
 	if transport != "" {
 		params.Set("corrNr", transport)
 	}
-	if _, err := c.transport.Request(ctx, collection, &RequestOptions{
-		Method: http.MethodPost, Query: params, Body: []byte(buildBlueShell(name, adtType, description, pkg)),
-		ContentType: bluesV2ContentType, Accept: bluesV2ContentType,
-	}); err != nil {
-		return "", fmt.Errorf("%s: creating %s: %w", opName, name, err)
+	var postErr error
+	for i, ct := range shellTypes {
+		_, postErr = c.transport.Request(ctx, collection, &RequestOptions{
+			Method: http.MethodPost, Query: params, Body: []byte(buildBlueShell(name, adtType, description, pkg)),
+			ContentType: ct, Accept: ct,
+		})
+		if postErr == nil || i == len(shellTypes)-1 || !isMediaTypeRejection(postErr) {
+			break
+		}
+	}
+	if postErr != nil {
+		return "", fmt.Errorf("%s: creating %s: %w", opName, name, postErr)
 	}
 
 	objURL := collection + "/" + url.PathEscape(strings.ToLower(name))

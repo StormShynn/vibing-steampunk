@@ -30,6 +30,25 @@ var adtXMLReadPrefixes = []string{
 	"/sap/bc/adt/aps/cloud/iam/",
 	"/sap/bc/adt/ddic/",
 	"/sap/bc/adt/numberranges/",
+	"/sap/bc/adt/aps/iam/",       // authorization objects / fields (SUSO, AUTH)
+	"/sap/bc/adt/aps/cloud/com/", // communication scenarios (SCO1, SCO2)
+	"/sap/bc/adt/acm/",           // access controls (DCLS)
+	"/sap/bc/adt/messageclass/",  // message classes
+	"/sap/bc/adt/enhancements/",  // BAdI implementations (ENHO)
+	"/sap/bc/adt/businessobjects/",
+	"/sap/bc/adt/businessservices/",
+}
+
+// serverDrivenAccept returns the media type ADT wants for the server-driven
+// sub-resources of a blue object (schema / configuration), else "".
+func serverDrivenAccept(p string) string {
+	switch {
+	case strings.HasSuffix(p, "/schema"):
+		return "application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1"
+	case strings.HasSuffix(p, "/configuration"):
+		return "application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1"
+	}
+	return ""
 }
 
 var classRunName = regexp.MustCompile(`^(/[A-Z0-9_]{1,10}/)?[A-Z0-9_]{1,30}$`)
@@ -70,9 +89,13 @@ func (c *Client) GetADTObjectXML(ctx context.Context, objectURI string) (string,
 	if err != nil {
 		return "", "", err
 	}
+	accept := "application/*, text/*"
+	if sd := serverDrivenAccept(p); sd != "" {
+		accept = sd
+	}
 	resp, err := c.transport.Request(ctx, p, &RequestOptions{
 		Method: http.MethodGet,
-		Accept: "application/*, text/*",
+		Accept: accept,
 	})
 	if err != nil {
 		return "", "", err

@@ -19,7 +19,7 @@ func (s *Server) routeSourceAction(ctx context.Context, action, objectType, obje
 	if action == "read" {
 		// GetSource covers: CLAS, PROG, INTF, FUNC, FUGR, INCL, DDLS, BDEF, SRVD, SRVB, MSAG, VIEW, ENHO
 		switch objectType {
-		case "CLAS", "PROG", "INTF", "FUNC", "FUGR", "INCL", "DDLS", "BDEF", "SRVD", "SRVB", "MSAG", "VIEW", "ENHO":
+		case "CLAS", "PROG", "INTF", "FUNC", "FUGR", "INCL", "DDLS", "BDEF", "SRVD", "SRVB", "MSAG", "VIEW", "ENHO", "DDLX", "DCLS", "STRU":
 			args := map[string]any{
 				"object_type": objectType,
 				"name":        objectName,
@@ -49,7 +49,7 @@ func (s *Server) routeSourceAction(ctx context.Context, action, objectType, obje
 	if action == "edit" {
 		// High-level WriteSource
 		switch objectType {
-		case "CLAS", "PROG", "INTF", "FUNC", "INCL", "DDLS", "BDEF", "SRVD", "MSAG", "TABL":
+		case "CLAS", "PROG", "INTF", "FUNC", "INCL", "DDLS", "BDEF", "SRVD", "MSAG", "TABL", "DDLX", "DCLS", "STRU":
 			if src := getStringParam(params, "source"); src != "" {
 				args := map[string]any{
 					"object_type": objectType,
@@ -102,7 +102,7 @@ func (s *Server) registerGetSource() {
 		mcp.WithDescription("Unified tool for reading ABAP source code across different object types. Replaces GetProgram, GetClass, GetInterface, GetFunction, GetInclude, GetFunctionGroup, GetClassInclude."),
 		mcp.WithString("object_type",
 			mcp.Required(),
-			mcp.Description("Object type: PROG (program), CLAS (class), INTF (interface), FUNC (function module), FUGR (function group), INCL (include), DDLS (CDS DDL source), VIEW (DDIC view), BDEF (behavior definition), SRVD (service definition), SRVB (service binding), MSAG (message class)"),
+			mcp.Description("Object type: PROG (program), CLAS (class), INTF (interface), FUNC (function module), FUGR (function group), INCL (include), DDLS (CDS DDL source), VIEW (DDIC view), BDEF (behavior definition), SRVD (service definition), SRVB (service binding), MSAG (message class), DDLX (metadata extension), DCLS (access control), STRU (DDIC structure)"),
 		),
 		mcp.WithString("name",
 			mcp.Required(),
@@ -132,10 +132,10 @@ func (s *Server) registerGetSource() {
 // registerWriteSource registers the unified WriteSource tool
 func (s *Server) registerWriteSource() {
 	s.mcpServer.AddTool(mcp.NewTool("WriteSource",
-		mcp.WithDescription("Unified tool for writing ABAP source code with automatic create/update detection. Supports PROG, CLAS, INTF, INCL, and RAP types (DDLS, BDEF, SRVD)."),
+		mcp.WithDescription("Unified tool for writing ABAP source code with automatic create/update detection. Supports PROG, CLAS, INTF, INCL, TABL (update), and RAP types (DDLS, BDEF, SRVD, DDLX metadata extension, DCLS access control, STRU structure)."),
 		mcp.WithString("object_type",
 			mcp.Required(),
-			mcp.Description("Object type: PROG (program), CLAS (class), INTF (interface), INCL (include), DDLS (CDS view), BDEF (behavior definition), SRVD (service definition)"),
+			mcp.Description("Object type: PROG (program), CLAS (class), INTF (interface), INCL (include), DDLS (CDS view), BDEF (behavior definition), SRVD (service definition), DDLX (metadata extension), DCLS (access control), STRU (DDIC structure, 'define structure')"),
 		),
 		mcp.WithString("name",
 			mcp.Required(),
