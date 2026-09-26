@@ -663,6 +663,9 @@ func (c *Client) CreateObject(ctx context.Context, opts CreateObjectOptions) err
 
 	opts.Name = strings.ToUpper(opts.Name)
 	opts.PackageName = strings.ToUpper(opts.PackageName)
+	if err := c.checkFISNaming(ctx, string(opts.ObjectType), opts.Name); err != nil {
+		return err
+	}
 
 	// For package creation, check the package being created (opts.Name), not the parent (opts.PackageName)
 	packageToCheck := opts.PackageName
@@ -1342,6 +1345,12 @@ func (c *Client) CreateTable(ctx context.Context, opts CreateTableOptions) error
 		Transport: opts.Transport,
 	}); err != nil {
 		return err
+	}
+	if err := c.checkFISNaming(ctx, "TABL/DT", opts.Name); err != nil {
+		return err
+	}
+	if err := c.requireTransportFor(ctx, "/sap/bc/adt/ddic/tables/"+strings.ToLower(opts.Name), opts.Package, opts.Transport); err != nil {
+		return fmt.Errorf("CreateTable: %w", err)
 	}
 
 	// Generate DDL source

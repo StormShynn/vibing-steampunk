@@ -1275,6 +1275,7 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 			mcp.WithString("implementation_name", mcp.Description("BAdI implementation name (default: name)")),
 			mcp.WithBoolean("example", mcp.Description("Example implementation (default false)")),
 			mcp.WithBoolean("default", mcp.Description("Default implementation (default false)")),
+			mcp.WithBoolean("active", mcp.Description("Switch the implementation on at runtime (default false: created but not called). Only when the user asks — on a shared tenant an active implementation runs for everyone")),
 			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
 			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
 		), s.handleCreateBAdIImplementation)

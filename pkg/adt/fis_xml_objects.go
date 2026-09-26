@@ -266,6 +266,7 @@ type BAdIImplOptions struct {
 	ImplementationName                    string // e.g. ZBDI_… (default: Name)
 	ImplementingClass                     string // existing class implementing the BAdI interface
 	Example, Default                      bool
+	Active                                bool // runtime switch of the BAdI implementation; default false (not called) — switch on only when the user asks
 }
 
 func buildBAdIImplContent(o BAdIImplOptions) (string, error) {
@@ -288,14 +289,14 @@ func buildBAdIImplContent(o BAdIImplOptions) (string, error) {
   <enho:contentSpecific>
     <enho:badiTechnology>
       <enho:badiImplementations>
-        <enho:badiImplementation enho:name="%s" enho:shortText="%s" enho:example="%t" enho:default="%t" enho:active="true">
+        <enho:badiImplementation enho:name="%s" enho:shortText="%s" enho:example="%t" enho:default="%t" enho:active="%t">
           <enho:enhancementSpot adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/%s" adtcore:type="ENHS/XSB" adtcore:name="%s"/>
           <enho:badiDefinition adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/%s#type=enhs%%2fxb;name=%s" adtcore:type="ENHS/XB" adtcore:name="%s"/>
           <enho:implementingClass adtcore:uri="/sap/bc/adt/oo/classes/%s" adtcore:type="CLAS/OC" adtcore:name="%s"/>
         </enho:badiImplementation>
       </enho:badiImplementations>
     </enho:badiTechnology>
-  </enho:contentSpecific>`, escapeXML(impl), escapeXML(short), o.Example, o.Default, ls, spot, ls, ld, def, lc, cls), nil
+  </enho:contentSpecific>`, escapeXML(impl), escapeXML(short), o.Example, o.Default, o.Active, ls, spot, ls, ld, def, lc, cls), nil
 }
 
 // CreateBAdIImplementation creates an enhancement implementation with one BAdI implementation and activates it.

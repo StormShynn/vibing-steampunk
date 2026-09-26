@@ -58,6 +58,12 @@ type TransportChoice struct {
 
 var errTransportCreate = errors.New("creating a transport request failed")
 
+// errTransportRequired: TransportChoice "require" (FIS) — the target records
+// changes and no request was named. The caller must ask the user for one; the
+// tool neither picks an open request (a shared tenant user sees everybody's)
+// nor lets SAP generate one.
+var errTransportRequired = errors.New("a transport request is required")
+
 // CheckTransport runs the transport check for an object about to be
 // written. devClass may be empty for an existing object.
 func (c *Client) CheckTransport(ctx context.Context, objectURL, devClass, operation string) (*TransportCheck, error) {
@@ -173,6 +179,13 @@ func (c *Client) chooseTransport(ctx context.Context, objectURL, devClass, lockC
 	if check.LockedIn != "" {
 		return &TransportChoice{Transport: check.LockedIn, Reason: "the request the object is already locked in"}, nil
 	}
+	if c.config.Safety.TransportChoice == TransportChoiceRequire {
+		pkg := check.Package
+		if pkg == "" {
+			pkg = strings.ToUpper(devClass)
+		}
+		return nil, fmt.Errorf("%w: package %s records changes (not a local package such as ZLOCAL/$TMP) — ask the user for the transport request and pass it as transport", errTransportRequired, pkg)
+	}
 	open := check.Candidates[:0:0]
 	for _, cand := range check.Candidates {
 		if cand.Status == "" || cand.Status == "D" || cand.Status == "L" {
@@ -261,7 +274,7 @@ func (c *Client) planTransport(ctx context.Context, supplied, objectURL, devClas
 	}
 	choice, err := c.chooseTransport(ctx, objectURL, devClass, "", "")
 	if err != nil {
-		if errors.Is(err, errTransportCreate) {
+		if errors.Is(err, errTransportCreate) || errors.Is(err, errTransportRequired) {
 			return &TransportChoice{Err: err}
 		}
 		return &TransportChoice{Reason: "transport not chosen here (" + err.Error() + "); left to SAP"}
@@ -295,4 +308,26 @@ func (c *Client) resolveWriteTransportFor(plan *TransportChoice, supplied, lockC
 		return "", "", err
 	}
 	return plan.Transport, plan.Reason, nil
+}
+
+// TransportChoiceRequire is the FIS mode: a write to a recording package without
+// a named request is refused (see errTransportRequired).
+const TransportChoiceRequire = "require"
+
+// requireTransportFor enforces TransportChoice "require" for create paths that
+// do not go through CreateObject (blue/JSON objects, DDIC data elements and
+// domains, tables): before the POST, ask ADT whether the target records
+// changes. It fails closed when that cannot be determined.
+func (c *Client) requireTransportFor(ctx context.Context, objectURL, pkg, transport string) error {
+	if transport != "" || c.config.Safety.TransportChoice != TransportChoiceRequire || strings.HasPrefix(pkg, "$") || pkg == "" {
+		return nil
+	}
+	check, err := c.CheckTransport(ctx, objectURL, pkg, "I")
+	if err != nil {
+		return fmt.Errorf("%w: could not verify whether package %s needs one (%v) — pass transport", errTransportRequired, strings.ToUpper(pkg), err)
+	}
+	if check.Recording {
+		return fmt.Errorf("%w: package %s records changes (not a local package such as ZLOCAL/$TMP) — ask the user for the transport request and pass it as transport", errTransportRequired, strings.ToUpper(pkg))
+	}
+	return nil
 }

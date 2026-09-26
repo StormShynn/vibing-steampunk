@@ -168,6 +168,12 @@ func (c *Client) blueJSONCreateCT(ctx context.Context, opName, collection, adtTy
 	if err := c.checkMutation(ctx, MutationContext{Op: OpCreate, OpName: opName, Package: pkg, Transport: transport}); err != nil {
 		return "", err
 	}
+	if err := c.checkFISNaming(ctx, adtType, name); err != nil {
+		return "", err
+	}
+	if err := c.requireTransportFor(ctx, collection+"/"+url.PathEscape(strings.ToLower(name)), pkg, transport); err != nil {
+		return "", fmt.Errorf("%s: %w", opName, err)
+	}
 
 	params := url.Values{}
 	if transport != "" {

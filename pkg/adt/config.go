@@ -218,7 +218,7 @@ func WithAllowedTransports(transports ...string) Option {
 }
 
 // WithTransportChoice sets how a write with no request named picks one:
-// "auto" (the default) or "off".
+// "auto" (the default), "off", or "require" (FIS: refuse when a recording package gets no request).
 func WithTransportChoice(mode string) Option {
 	return func(c *Config) {
 		c.Safety.TransportChoice = mode

@@ -81,6 +81,12 @@ func (c *Client) ddicCreate(ctx context.Context, opName, collection, contentType
 	if err := c.checkMutation(ctx, MutationContext{Op: OpCreate, OpName: opName, Package: pkg, Transport: transport}); err != nil {
 		return "", err
 	}
+	if err := c.checkFISNaming(ctx, adtType, name); err != nil {
+		return "", err
+	}
+	if err := c.requireTransportFor(ctx, collection+"/"+url.PathEscape(strings.ToLower(name)), pkg, transport); err != nil {
+		return "", fmt.Errorf("%s: %w", opName, err)
+	}
 
 	create := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <%[1]s xmlns:%[2]s xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="%[3]s" adtcore:type="%[4]s" adtcore:description="%[5]s">

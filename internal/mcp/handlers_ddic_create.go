@@ -295,7 +295,7 @@ func (s *Server) handleCreateBAdIImplementation(ctx context.Context, req mcp.Cal
 		Package: argString(req, "package"), Transport: argString(req, "transport"),
 		EnhancementSpot: argString(req, "enhancement_spot"), BAdIDefinition: argString(req, "badi_definition"),
 		ImplementationName: argString(req, "implementation_name"), ImplementingClass: argString(req, "implementing_class"),
-		Example: argBool(req, "example"), Default: argBool(req, "default")}
+		Example: argBool(req, "example"), Default: argBool(req, "default"), Active: argBool(req, "active")}
 	u, err := s.adtClient.CreateBAdIImplementation(ctx, o)
 	if err != nil {
 		return newToolResultError(err.Error()), nil
