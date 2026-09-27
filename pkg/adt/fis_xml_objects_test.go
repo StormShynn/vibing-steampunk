@@ -114,6 +114,10 @@ func TestBAdIImplShellAndInsert(t *testing.T) {
 	if err != nil || !strings.Contains(doc, `<enho:badiImplementations><enho:badiImplementation enho:name="ZEI_X"`) {
 		t.Fatalf("insert: %v %s", err, doc)
 	}
+	doc, err = insertBAdIImpl(`<enho:contentSpecific><enho:badiTechnology/></enho:contentSpecific>`, elem)
+	if err != nil || !strings.Contains(doc, `<enho:badiTechnology><enho:badiImplementations><enho:badiImplementation `) {
+		t.Fatalf("collapsed badiTechnology: %v %s", err, doc)
+	}
 	if _, err := insertBAdIImpl("<a/>", elem); err == nil {
 		t.Error("want error without badiImplementations")
 	}

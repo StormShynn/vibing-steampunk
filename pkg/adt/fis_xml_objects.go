@@ -391,6 +391,19 @@ func insertBAdIImpl(doc, elem string) (string, error) {
 	if i := strings.Index(doc, "</enho:badiImplementations>"); i >= 0 {
 		return doc[:i] + elem + doc[i:], nil
 	}
+	// A fresh shell comes back with the list collapsed (HL8, 2026-09-28).
+	list := "<enho:badiImplementations>" + elem + "</enho:badiImplementations>"
+	for _, empty := range []struct{ tag, repl string }{
+		{"<enho:badiTechnology/>", "<enho:badiTechnology>" + list + "</enho:badiTechnology>"},
+		{"<enho:contentSpecific/>", "<enho:contentSpecific><enho:badiTechnology>" + list + "</enho:badiTechnology></enho:contentSpecific>"},
+	} {
+		if i := strings.Index(doc, empty.tag); i >= 0 {
+			return doc[:i] + empty.repl + doc[i+len(empty.tag):], nil
+		}
+	}
+	if i := strings.Index(doc, "</enho:badiTechnology>"); i >= 0 {
+		return doc[:i] + list + doc[i:], nil
+	}
 	return "", fmt.Errorf("enho:badiImplementations not found in the server document")
 }
 
