@@ -112,7 +112,8 @@ func (c *Client) createAndActivateXML(ctx context.Context, op string, ot Creatab
 		// Authorization fields (and other IAM form objects) are saved active
 		// by the POST itself; ADT then refuses a separate activation without a
 		// message (HL8, 2026-09-28). Trust the document when it is not inactive.
-		if len(res.ProblemLines()) == 0 && c.xmlObjectNotInactive(ctx, objURL) {
+		// (ProblemLines is never empty: it adds its own "SAP named no reason".)
+		if len(res.ErrorMessages()) == 0 && c.xmlObjectNotInactive(ctx, objURL) {
 			return objURL, nil
 		}
 		return objURL, fmt.Errorf("%s: %s created but did not activate: %s (check GetInactiveObjects — SAP sometimes reports a false failure)", op, name, strings.Join(res.ProblemLines(), "; "))
