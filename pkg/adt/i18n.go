@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -222,32 +223,20 @@ func (c *Client) WriteMessageClassTexts(ctx context.Context, name, lang string, 
 		return err
 	}
 
-	// Build the XML body in the shape ADT actually serves and expects: a
-	// namespaced <mc:messageClass> root whose messages carry mc:msgno/mc:msgtext
-	// as ATTRIBUTES. MessageClass itself is the read model — Go's encoding/xml
-	// cannot express prefixed names for writing and namespace-agnostic matching
-	// for reading in one struct — so the request has its own type.
-	mc := messageClassWrite{
-		XMLNSmc:      "http://www.sap.com/adt/MessageClass",
-		XMLNSadtcore: "http://www.sap.com/adt/core",
-		Name:         name,
-	}
-	// The PUT replaces the whole document: without the description the class
-	// lost its short text on every text write (seen on HL8, 2026-09-27).
-	// Read it inside the caller's stateful session: a stateless request here
-	// ends that session and the lock handle the PUT carries is gone (423
-	// "invalid lock handle", HL8 2026-09-28).
-	if cur, gerr := c.getMessageClassStateful(ctx, name); gerr == nil {
-		mc.Description = cur.Description
-	}
-	for _, t := range texts {
-		mc.Messages = append(mc.Messages, messageWrite{Number: t.Number, Text: t.Text})
-	}
-	body, err := xml.Marshal(mc)
+	// Read-modify-write, like Eclipse ADT (HL8 communication log 2026-09-28):
+	// GET the whole document inside the caller's stateful session, change the
+	// texts, PUT the whole document back. A minimal document (name + msgno +
+	// msgtext only) was accepted but its texts were not found by MESSAGE at
+	// runtime until the class was saved once in Eclipse.
+	doc, err := c.getMessageClassDoc(ctx, name, lang)
 	if err != nil {
-		return fmt.Errorf("marshal message class XML: %w", err)
+		return fmt.Errorf("write message class texts: reading %s: %w", name, err)
 	}
-	body = append([]byte(xml.Header), body...)
+	newDoc, err := editMessageClassDoc(doc, texts)
+	if err != nil {
+		return fmt.Errorf("write message class texts: %w", err)
+	}
+	body := []byte(newDoc)
 
 	path := fmt.Sprintf("/sap/bc/adt/messageclass/%s", url.PathEscape(strings.ToLower(name)))
 
@@ -522,4 +511,63 @@ func (c *Client) getMessageClassStateful(ctx context.Context, name string) (*Mes
 		return nil, err
 	}
 	return &mc, nil
+}
+
+// getMessageClassDoc returns the raw message class document (stateful, in lang).
+func (c *Client) getMessageClassDoc(ctx context.Context, name, lang string) (string, error) {
+	path := fmt.Sprintf("/sap/bc/adt/messageclass/%s", url.PathEscape(strings.ToLower(name)))
+	resp, err := c.transport.Request(ctx, path, &RequestOptions{Method: http.MethodGet,
+		Accept: "application/vnd.sap.adt.mc.messageclass+xml", Stateful: true, OverrideLanguage: lang})
+	if err != nil {
+		return "", err
+	}
+	return string(resp.Body), nil
+}
+
+var msgElemRe = regexp.MustCompile(`<mc:messages\b[^>]*>`)
+var msgNoRe = regexp.MustCompile(`mc:msgno="(\d{3})"`)
+var msgTextRe = regexp.MustCompile(`mc:msgtext="[^"]*"`)
+
+// editMessageClassDoc sets the text of existing messages and appends new ones.
+func editMessageClassDoc(doc string, texts []MessageClassMessage) (string, error) {
+	if !strings.Contains(doc, "</mc:messageClass>") {
+		return "", fmt.Errorf("server document has no mc:messageClass")
+	}
+	want := map[string]string{}
+	for _, t := range texts {
+		if len(t.Number) != 3 || strings.Trim(t.Number, "0123456789") != "" {
+			return "", fmt.Errorf("message number %q must be 3 digits", t.Number)
+		}
+		want[t.Number] = t.Text
+	}
+	done := map[string]bool{}
+	doc = msgElemRe.ReplaceAllStringFunc(doc, func(tag string) string {
+		m := msgNoRe.FindStringSubmatch(tag)
+		if m == nil {
+			return tag
+		}
+		txt, ok := want[m[1]]
+		if !ok {
+			return tag
+		}
+		done[m[1]] = true
+		attr := `mc:msgtext="` + escapeXML(txt) + `"`
+		if msgTextRe.MatchString(tag) {
+			return msgTextRe.ReplaceAllLiteralString(tag, attr)
+		}
+		return strings.Replace(tag, "<mc:messages", "<mc:messages "+attr, 1)
+	})
+	var add strings.Builder
+	for _, t := range texts {
+		if done[t.Number] {
+			continue
+		}
+		done[t.Number] = true
+		fmt.Fprintf(&add, `<mc:messages adtcore:name="" mc:documented="false" mc:msgno="%s" mc:msgtext="%s" mc:selfexplainatory="true"/>`, t.Number, escapeXML(t.Text))
+	}
+	if add.Len() > 0 {
+		i := strings.LastIndex(doc, "</mc:messageClass>")
+		doc = doc[:i] + add.String() + doc[i:]
+	}
+	return doc, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -43,9 +44,7 @@ var fisXMLTypes = map[CreatableObjectType]fisXMLType{
 	ObjectTypeCommScenario: {"/sap/bc/adt/aps/cloud/com/sco1", "sco1:sco1", `xmlns:sco1="http://www.sap.com/com/sco1"`, "SCO1", "", ""},
 	ObjectTypeBAdIImpl: {"/sap/bc/adt/enhancements/enhoxhb", "enho:objectData", `xmlns:enho="http://www.sap.com/adt/enhancements/enho"`, "ENHO/XHB",
 		` xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"`,
-		// ZEI_MMIM_SLOC_CHECK (HL8) carries it; without it the POST fails with
-		// "No documentation class is assigned to object R3TR ENHO" [Inference].
-		"\n  adtcore:abapLanguageVersion=\"cloudDevelopment\""},
+		""},
 }
 
 func init() {
@@ -329,7 +328,34 @@ type BAdIImplOptions struct {
 	Active                                bool // runtime switch of the BAdI implementation; default false (not called) — switch on only when the user asks
 }
 
-func buildBAdIImplContent(o BAdIImplOptions) (string, error) {
+// buildBAdIImplShell is the create body Eclipse ADT sends (HL8 ADT
+// communication log, 2026-09-28): the spot as an EXTO usage and an EMPTY list
+// of BAdI implementations. Posting the implementation in the create body is
+// what SAP refuses with "No documentation class is assigned to object R3TR
+// ENHO" (SD 269); the implementation is added by a PUT afterwards.
+func buildBAdIImplShell(o BAdIImplOptions) (string, error) {
+	spot := strings.ToUpper(strings.TrimSpace(o.EnhancementSpot))
+	if spot == "" || strings.TrimSpace(o.BAdIDefinition) == "" || strings.TrimSpace(o.ImplementingClass) == "" {
+		return "", fmt.Errorf("enhancement_spot, badi_definition and implementing_class are required")
+	}
+	return fmt.Sprintf(`  <enho:contentCommon enho:toolType="BADI_IMPL">
+    <enho:usages>
+      <enhcore:referencedObject enhcore:element_usage="EXTO" enhcore:program_id="R3TR">
+        <enhcore:objectReference adtcore:name="%s" adtcore:type="ENHS/XS"/>
+        <enhcore:mainObjectReference/>
+      </enhcore:referencedObject>
+    </enho:usages>
+  </enho:contentCommon>
+  <enho:contentSpecific>
+    <enho:badiTechnology>
+      <enho:badiImplementations/>
+    </enho:badiTechnology>
+  </enho:contentSpecific>`, escapeXML(spot)), nil
+}
+
+// buildBAdIImplElement is one enho:badiImplementation, in the shape SAP serves
+// for an existing implementation (ZEI_MMIM_SLOC_CHECK).
+func buildBAdIImplElement(o BAdIImplOptions) (string, error) {
 	spot := strings.ToUpper(strings.TrimSpace(o.EnhancementSpot))
 	def := strings.ToUpper(strings.TrimSpace(o.BAdIDefinition))
 	cls := strings.ToUpper(strings.TrimSpace(o.ImplementingClass))
@@ -345,29 +371,136 @@ func buildBAdIImplContent(o BAdIImplOptions) (string, error) {
 	if len([]rune(short)) > 40 {
 		short = string([]rune(short)[:40])
 	}
-	return fmt.Sprintf(`  <enho:contentCommon enho:toolType="BADI_IMPL"/>
-  <enho:contentSpecific>
-    <enho:badiTechnology>
-      <enho:badiImplementations>
-        <enho:badiImplementation enho:name="%s" enho:shortText="%s" enho:example="%t" enho:default="%t" enho:active="%t">
-          <enho:enhancementSpot adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/%s" adtcore:type="ENHS/XSB" adtcore:name="%s"/>
-          <enho:badiDefinition adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/%s#type=enhs%%2fxb;name=%s" adtcore:type="ENHS/XB" adtcore:name="%s"/>
-          <enho:implementingClass adtcore:uri="/sap/bc/adt/oo/classes/%s" adtcore:type="CLAS/OC" adtcore:name="%s"/>
-        </enho:badiImplementation>
-      </enho:badiImplementations>
-    </enho:badiTechnology>
-  </enho:contentSpecific>`, escapeXML(impl), escapeXML(short), o.Example, o.Default, o.Active, ls, spot, ls, ld, def, lc, cls), nil
+	return fmt.Sprintf(`<enho:badiImplementation enho:name="%s" enho:shortText="%s" enho:example="%t" enho:default="%t" enho:active="%t"><enho:enhancementSpot adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/%s" adtcore:type="ENHS/XSB" adtcore:name="%s"/><enho:badiDefinition adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/%s#type=enhs%%2fxb;name=%s" adtcore:type="ENHS/XB" adtcore:name="%s"/><enho:implementingClass adtcore:uri="/sap/bc/adt/oo/classes/%s" adtcore:type="CLAS/OC" adtcore:name="%s"/></enho:badiImplementation>`,
+		escapeXML(impl), escapeXML(short), o.Example, o.Default, o.Active, ls, spot, ls, ld, def, lc, cls), nil
 }
 
-// CreateBAdIImplementation creates an enhancement implementation with one BAdI implementation and activates it.
+// buildBAdIImplContent is kept for PlanBAdIImplementation's validation.
+func buildBAdIImplContent(o BAdIImplOptions) (string, error) {
+	if _, err := buildBAdIImplShell(o); err != nil {
+		return "", err
+	}
+	return buildBAdIImplElement(o)
+}
+
+// insertBAdIImpl adds one badiImplementation to the server's ENHO document.
+func insertBAdIImpl(doc, elem string) (string, error) {
+	if i := strings.Index(doc, "<enho:badiImplementations/>"); i >= 0 {
+		return doc[:i] + "<enho:badiImplementations>" + elem + "</enho:badiImplementations>" + doc[i+len("<enho:badiImplementations/>"):], nil
+	}
+	if i := strings.Index(doc, "</enho:badiImplementations>"); i >= 0 {
+		return doc[:i] + elem + doc[i:], nil
+	}
+	return "", fmt.Errorf("enho:badiImplementations not found in the server document")
+}
+
+const enhoContentType = "application/vnd.sap.adt.enh.enhoxhb.v4+xml"
+
+// CreateBAdIImplementation creates the enhancement implementation shell the way
+// Eclipse does, adds the BAdI implementation (lock, GET, PUT, unlock) and activates.
 func (c *Client) CreateBAdIImplementation(ctx context.Context, o BAdIImplOptions) (string, error) {
 	name, err := checkFISName("CreateBAdIImplementation", o.Name, 30)
 	if err != nil {
 		return "", err
 	}
-	content, err := buildBAdIImplContent(o)
+	shell, err := buildBAdIImplShell(o)
 	if err != nil {
 		return "", fmt.Errorf("CreateBAdIImplementation: %w", err)
 	}
-	return c.createAndActivateXML(ctx, "CreateBAdIImplementation", ObjectTypeBAdIImpl, name, o.Description, o.Package, o.Transport, content)
+	elem, err := buildBAdIImplElement(o)
+	if err != nil {
+		return "", fmt.Errorf("CreateBAdIImplementation: %w", err)
+	}
+	if strings.TrimSpace(o.Description) == "" || len([]rune(o.Description)) > 60 {
+		return "", fmt.Errorf("CreateBAdIImplementation: description is required, max 60 characters")
+	}
+	if err := c.CreateObject(ctx, CreateObjectOptions{ObjectType: ObjectTypeBAdIImpl, Name: name, Description: o.Description,
+		PackageName: o.Package, Transport: o.Transport, Source: shell}); err != nil {
+		return "", fmt.Errorf("CreateBAdIImplementation: %w", err)
+	}
+	objURL := fisXMLObjectURL(ObjectTypeBAdIImpl, name)
+	ctx = withMutationPackageChecked(ctx, objURL)
+	lock, err := c.LockObject(ctx, objURL, "MODIFY")
+	if err != nil {
+		return objURL, fmt.Errorf("CreateBAdIImplementation: %s created (empty), lock to add the BAdI implementation failed: %w", name, err)
+	}
+	werr := func() error {
+		resp, err := c.transport.Request(ctx, objURL, &RequestOptions{Method: http.MethodGet,
+			Accept: "application/vnd.sap.adt.enh.enhoxhb.v3+xml, " + enhoContentType, Stateful: true})
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", name, err)
+		}
+		doc, err := insertBAdIImpl(string(resp.Body), elem)
+		if err != nil {
+			return err
+		}
+		q := url.Values{}
+		q.Set("lockHandle", lock.LockHandle)
+		if o.Transport != "" {
+			q.Set("corrNr", o.Transport)
+		}
+		if _, err := c.transport.Request(ctx, objURL, &RequestOptions{Method: http.MethodPut, Query: q, Body: []byte(doc),
+			ContentType: enhoContentType, Accept: enhoContentType, Stateful: true}); err != nil {
+			return fmt.Errorf("writing the BAdI implementation: %w", err)
+		}
+		return nil
+	}()
+	if uerr := c.UnlockObject(ctx, objURL, lock.LockHandle); uerr != nil && werr == nil {
+		werr = fmt.Errorf("unlocking: %w", uerr)
+	}
+	if werr != nil {
+		return objURL, fmt.Errorf("CreateBAdIImplementation: %s created (empty): %w", name, werr)
+	}
+	res, err := c.Activate(ctx, objURL, name)
+	if err == nil && !res.Success {
+		res, err = c.Activate(ctx, objURL, name)
+	}
+	if err != nil {
+		return objURL, fmt.Errorf("CreateBAdIImplementation: %s created, activation: %w", name, err)
+	}
+	if !res.Success {
+		return objURL, fmt.Errorf("CreateBAdIImplementation: %s created but did not activate: %s", name, strings.Join(res.ProblemLines(), "; "))
+	}
+	return objURL, nil
+}
+
+// PlanBAdIImplementation validates a BAdI implementation without writing and
+// returns the Eclipse ADT steps (see handleCreateBAdIImplementation).
+func (c *Client) PlanBAdIImplementation(ctx context.Context, o BAdIImplOptions) (string, error) {
+	name, err := checkFISName("CreateBAdIImplementation", o.Name, 30)
+	if err != nil {
+		return "", err
+	}
+	if err := checkNamingRule("ENHO/XHB", name); err != nil {
+		return "", err
+	}
+	if _, err := buildBAdIImplContent(o); err != nil {
+		return "", fmt.Errorf("CreateBAdIImplementation: %w", err)
+	}
+	cls := strings.ToUpper(strings.TrimSpace(o.ImplementingClass))
+	clsState := "found"
+	if hits, serr := c.SearchObject(ctx, cls, 5); serr != nil {
+		clsState = "not checked (" + serr.Error() + ")"
+	} else {
+		clsState = "NOT FOUND — create it first (INTERFACES if_badi_interface + the BAdI interface)"
+		for _, h := range hits {
+			if strings.EqualFold(h.Name, cls) {
+				clsState = "found"
+				break
+			}
+		}
+	}
+	impl := strings.ToUpper(strings.TrimSpace(o.ImplementationName))
+	if impl == "" {
+		impl = name
+	}
+	pkg := strings.ToUpper(strings.TrimSpace(o.Package))
+	return fmt.Sprintf(`Nothing was written. Create the BAdI implementation in Eclipse ADT:
+1. Project Explorer: package %s -> New -> Other ABAP Repository Object -> Enhancements -> BAdI Enhancement Implementation.
+2. Name %s, description %q, enhancement spot %s, transport %s.
+3. In the editor: Add BAdI Implementation -> BAdI definition %s, implementation name %s, implementing class %s (class: %s).
+4. Leave "Implementation is active" %s; example=%t, default=%t. Save and activate.
+(experimental=true attempts the ADT create; on HL8 it fails with "No documentation class is assigned to object R3TR ENHO" and still records the ENHO in the transport.)`,
+		pkg, name, o.Description, strings.ToUpper(o.EnhancementSpot), o.Transport,
+		strings.ToUpper(o.BAdIDefinition), impl, cls, clsState, map[bool]string{true: "ON (user asked)", false: "OFF"}[o.Active], o.Example, o.Default), nil
 }

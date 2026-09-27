@@ -296,6 +296,17 @@ func (s *Server) handleCreateBAdIImplementation(ctx context.Context, req mcp.Cal
 		EnhancementSpot: argString(req, "enhancement_spot"), BAdIDefinition: argString(req, "badi_definition"),
 		ImplementationName: argString(req, "implementation_name"), ImplementingClass: argString(req, "implementing_class"),
 		Example: argBool(req, "example"), Default: argBool(req, "default"), Active: argBool(req, "active")}
+	if !argBool(req, "experimental") {
+		// HL8 (2026-09-28): SAP refuses the ADT create with "No documentation
+		// class is assigned to object R3TR ENHO" but still records the ENHO in
+		// the transport. Default: check everything, write nothing, hand over the
+		// Eclipse steps.
+		plan, err := s.adtClient.PlanBAdIImplementation(ctx, o)
+		if err != nil {
+			return newToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(plan), nil
+	}
 	u, err := s.adtClient.CreateBAdIImplementation(ctx, o)
 	if err != nil {
 		return newToolResultError(err.Error()), nil

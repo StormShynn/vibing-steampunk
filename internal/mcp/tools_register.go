@@ -1266,7 +1266,7 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 
 	if shouldRegister("CreateBAdIImplementation") {
 		s.mcpServer.AddTool(mcp.NewTool("CreateBAdIImplementation",
-			mcp.WithDescription("Create and activate an enhancement implementation (ENHO) with one BAdI implementation for a released cloud BAdI. Create the implementing class (INTERFACES <BAdI interface>) first."),
+			mcp.WithDescription("Check a BAdI implementation (ENHO) and return the Eclipse ADT steps to create it — writes nothing by default, because SAP refuses the ADT create on S/4HANA Cloud Public Edition and still records the ENHO in the transport. experimental=true attempts the create. Create the implementing class (INTERFACES <BAdI interface>) first."),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Enhancement implementation (Z/Y, max 30)")),
 			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
 			mcp.WithString("enhancement_spot", mcp.Required(), mcp.Description("Enhancement spot, e.g. MMIM_CLOUD_BADI")),
@@ -1278,6 +1278,7 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 			mcp.WithBoolean("active", mcp.Description("Switch the implementation on at runtime (default false: created but not called). Only when the user asks — on a shared tenant an active implementation runs for everyone")),
 			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
 			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+			mcp.WithBoolean("experimental", mcp.Description("Create for real (default false): empty shell like Eclipse, then add the BAdI implementation and activate (fix-8k, being verified). Older builds failed with SD 269 and left an ENHO line in the transport")),
 		), s.handleCreateBAdIImplementation)
 	}
 

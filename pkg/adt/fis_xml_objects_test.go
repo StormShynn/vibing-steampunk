@@ -93,3 +93,28 @@ func TestXMLTypesRegistered(t *testing.T) {
 		t.Fatal("11 chars accepted")
 	}
 }
+
+func TestBAdIImplShellAndInsert(t *testing.T) {
+	o := BAdIImplOptions{Name: "ZEI_X", Description: "d", EnhancementSpot: "mmim_cloud_badi",
+		BAdIDefinition: "MMIM_ITEM_CHECK_DATA", ImplementingClass: "ZCL_X"}
+	shell, err := buildBAdIImplShell(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`enhcore:element_usage="EXTO"`, `adtcore:name="MMIM_CLOUD_BADI" adtcore:type="ENHS/XS"`, "<enho:badiImplementations/>"} {
+		if !strings.Contains(shell, want) {
+			t.Errorf("shell misses %s", want)
+		}
+	}
+	if strings.Contains(shell, "badiImplementation ") {
+		t.Error("shell must not carry the implementation (SD 269)")
+	}
+	elem, _ := buildBAdIImplElement(o)
+	doc, err := insertBAdIImpl("<a><enho:badiImplementations/></a>", elem)
+	if err != nil || !strings.Contains(doc, `<enho:badiImplementations><enho:badiImplementation enho:name="ZEI_X"`) {
+		t.Fatalf("insert: %v %s", err, doc)
+	}
+	if _, err := insertBAdIImpl("<a/>", elem); err == nil {
+		t.Error("want error without badiImplementations")
+	}
+}
