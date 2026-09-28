@@ -283,6 +283,9 @@ type CreateObjectOptions struct {
 	// For SIA6: the object the app stands for, e.g. the generated communication
 	// scenario on an IBS app. Empty for a plain external app.
 	SecondaryID string `json:"secondaryID,omitempty"`
+	// For SIA6: Fiori Launchpad App Descriptor Item ID (UIAD, e.g. ZAA01_UI5R)
+	// of the Fiori app the IAM app stands for. Only valid with appType EXT.
+	UI5AppID string `json:"ui5AppId,omitempty"`
 	// For SIA7: the business catalog receiving the app.
 	BusinessCatalogID string `json:"businessCatalogID,omitempty"`
 	// For SIA7: the IAM app being assigned.

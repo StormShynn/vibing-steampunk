@@ -64,7 +64,9 @@ func (s *Server) registerIAMTools(shouldRegister func(string) bool) {
 				"Publishing a service binding does NOT create this object: it creates an IAM business "+
 				"service (SIA6 with appType IBS) plus a communication scenario, and neither can be put "+
 				"in a business catalog. This is the assignable app that goes in one. Use app_type EXT "+
-				"for an application served outside the system, such as a Fiori app on BTP Cloud Foundry. "+
+				"for an application served outside the system, such as a Fiori app on BTP Cloud Foundry, "+
+				"and for a Fiori app deployed to this system give ui5_app_id (the Fiori Launchpad App "+
+				"Descriptor Item ID, e.g. ZAA01_UI5R). "+
 				"Until the app is published, the business catalog assignment does not see it, which "+
 				"reads as the app not existing."),
 			mcp.WithString("name", mcp.Required(),
@@ -78,6 +80,10 @@ func (s *Server) registerIAMTools(shouldRegister func(string) bool) {
 			mcp.WithString("secondary_id",
 				mcp.Description("Object the app stands for, e.g. the generated communication scenario "+
 					"on an IBS app. Leave empty for a plain external app.")),
+			mcp.WithString("ui5_app_id",
+				mcp.Description("Fiori app deployed to this system: its Fiori Launchpad App Descriptor "+
+					"Item ID (ADT type UIAD, usually <BSP>_UI5R; find it with SearchObject *_UI5R). "+
+					"Forces app_type EXT.")),
 			mcp.WithString("transport",
 				mcp.Description("Transport request number, required for a transportable package")),
 			mcp.WithBoolean("publish",
@@ -290,6 +296,14 @@ func (s *Server) handleCreateIAMApp(ctx context.Context, request mcp.CallToolReq
 
 	appType, _ := args["app_type"].(string)
 	secondaryID, _ := args["secondary_id"].(string)
+	ui5AppID, _ := args["ui5_app_id"].(string)
+	ui5AppID = strings.ToUpper(strings.TrimSpace(ui5AppID))
+	if ui5AppID != "" {
+		if appType != "" && !strings.EqualFold(appType, adt.IAMAppTypeExternal) {
+			return newToolResultError("ui5_app_id needs app_type EXT (the Fiori Launchpad App Descriptor Item ID field is only open for external apps)"), nil
+		}
+		appType = adt.IAMAppTypeExternal
+	}
 	transport, _ := args["transport"].(string)
 	publish := true
 	if p, ok := args["publish"].(bool); ok {
@@ -312,6 +326,7 @@ func (s *Server) handleCreateIAMApp(ctx context.Context, request mcp.CallToolReq
 		Transport:   transport,
 		AppType:     appType,
 		SecondaryID: secondaryID,
+		UI5AppID:    ui5AppID,
 	}); err != nil {
 		// Same reasoning as the catalog: a rerun after a later step failed must
 		// not be blocked by the object already being there.
@@ -372,6 +387,22 @@ func (s *Server) handleCreateIAMApp(ctx context.Context, request mcp.CallToolReq
 					"app is not published. An app with no services or authorizations has "+
 					"nothing to publish.", status, adt.IAMPublishStatusPublished)
 			steps = append(steps, "publish returned "+status)
+		}
+	}
+
+	if ui5AppID != "" {
+		got, nsvc, err := s.adtClient.IAMAppUI5Status(ctx, name)
+		switch {
+		case err != nil:
+			result["ui5_check_error"] = err.Error()
+		case !strings.EqualFold(got, ui5AppID):
+			result["ui5_warning"] = fmt.Sprintf("the app reads back ui5AppId %q, not %q — set the Fiori Launchpad App Descriptor Item ID in Eclipse", got, ui5AppID)
+		default:
+			result["ui5_app_id"] = got
+			result["services"] = nsvc
+			if nsvc == 0 {
+				result["ui5_warning"] = "ui5AppId is set but the app lists no services yet: open it in Eclipse, check the Services tab picked up the app's OData service, save, activate and Publish Locally"
+			}
 		}
 	}
 

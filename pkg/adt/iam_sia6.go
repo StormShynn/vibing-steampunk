@@ -101,6 +101,14 @@ func buildIAMAppBody(opts CreateObjectOptions, typeInfo objectTypeInfo, responsi
 			escapeXML(strings.ToUpper(opts.SecondaryID)))
 	}
 
+	ui5 := ""
+	if opts.UI5AppID != "" {
+		// Order follows the server document: appID, appType, ui5AppId, ...
+		// (read from ZIAM_ZAA01_EXT on HL8, 2026-09-28).
+		ui5 = fmt.Sprintf("\n    <sia6:ui5AppId>%s</sia6:ui5AppId>",
+			escapeXML(strings.ToUpper(opts.UI5AppID)))
+	}
+
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <%s %s xmlns:adtcore="http://www.sap.com/adt/core"
   adtcore:description="%s"
@@ -112,7 +120,7 @@ func buildIAMAppBody(opts CreateObjectOptions, typeInfo objectTypeInfo, responsi
   <adtcore:packageRef adtcore:name="%s"/>
   <sia6:content>
     <sia6:appID>%s</sia6:appID>
-    <sia6:appType>%s</sia6:appType>
+    <sia6:appType>%s</sia6:appType>%s
     <sia6:scopeDependent>false</sia6:scopeDependent>%s
     <sia6:services/>
   </sia6:content>
@@ -124,6 +132,7 @@ func buildIAMAppBody(opts CreateObjectOptions, typeInfo objectTypeInfo, responsi
 		strings.ToUpper(opts.PackageName),
 		name,
 		appType,
+		ui5,
 		secondary,
 		typeInfo.rootName)
 }
@@ -184,4 +193,17 @@ func (c *Client) PublishIAMApp(ctx context.Context, appName string) (string, err
 		return "", fmt.Errorf("publishing IAM app %s: %w", strings.ToUpper(appName), err)
 	}
 	return firstXMLValue(string(resp.Body), "sia6:publishingStatusText"), nil
+}
+
+// IAMAppUI5Status reads an IAM app back and reports the Fiori Launchpad App
+// Descriptor Item ID it holds and how many services it lists. On HL8 a Fiori IAM
+// app (ZIAM_ZAA01_EXT) lists the OData service of its app with
+// sia6:uiadSource = the descriptor item, i.e. the services come from the UIAD.
+func (c *Client) IAMAppUI5Status(ctx context.Context, name string) (ui5AppID string, services int, err error) {
+	resp, err := c.RawGet(ctx, IAMAppURL(name), "*/*")
+	if err != nil {
+		return "", 0, err
+	}
+	body := string(resp.Body)
+	return firstXMLValue(body, "sia6:ui5AppId"), strings.Count(body, "<sia6:service>"), nil
 }
