@@ -229,7 +229,31 @@ func (c *Client) blueJSONCreateCT(ctx context.Context, opName, collection, adtTy
 		return objURL, fmt.Errorf("%s: activating %s: %w", opName, name, err)
 	}
 	if !activation.Success {
+		// APLO (HL8, 2026-09-28): ADT refuses the activation without any message
+		// although the object is already active. Trust the inactive list when
+		// SAP gave no error.
+		if len(activation.ErrorMessages()) == 0 && c.notInInactiveList(ctx, objURL, name) {
+			return objURL, nil
+		}
 		return objURL, fmt.Errorf("%s: %s was created but did not activate: %s", opName, name, strings.Join(activation.ProblemLines(), "; "))
 	}
 	return objURL, nil
+}
+
+// notInInactiveList reports whether the object is absent from the user's
+// inactive objects (false when the list cannot be read).
+func (c *Client) notInInactiveList(ctx context.Context, objURL, name string) bool {
+	recs, err := c.GetInactiveObjects(ctx)
+	if err != nil {
+		return false
+	}
+	for _, r := range recs {
+		if r.Object == nil {
+			continue
+		}
+		if strings.EqualFold(r.Object.Name, name) || strings.EqualFold(strings.TrimSuffix(r.Object.URI, "/"), objURL) {
+			return false
+		}
+	}
+	return true
 }
