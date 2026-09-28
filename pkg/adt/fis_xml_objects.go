@@ -513,7 +513,7 @@ func (c *Client) PlanBAdIImplementation(ctx context.Context, o BAdIImplOptions) 
 2. Name %s, description %q, enhancement spot %s, transport %s.
 3. In the editor: Add BAdI Implementation -> BAdI definition %s, implementation name %s, implementing class %s (class: %s).
 4. Leave "Implementation is active" %s; example=%t, default=%t. Save and activate.
-(experimental=true attempts the ADT create; on HL8 it fails with "No documentation class is assigned to object R3TR ENHO" and still records the ENHO in the transport.)`,
+(Without plan_only the tool creates and activates it itself — verified on HL8, 2026-09-28.)`,
 		pkg, name, o.Description, strings.ToUpper(o.EnhancementSpot), o.Transport,
 		strings.ToUpper(o.BAdIDefinition), impl, cls, clsState, map[bool]string{true: "ON (user asked)", false: "OFF"}[o.Active], o.Example, o.Default), nil
 }
