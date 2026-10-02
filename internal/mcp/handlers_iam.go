@@ -70,7 +70,7 @@ func (s *Server) registerIAMTools(shouldRegister func(string) bool) {
 				"Until the app is published, the business catalog assignment does not see it, which "+
 				"reads as the app not existing."),
 			mcp.WithString("name", mcp.Required(),
-				mcp.Description("IAM app name, e.g. ZIA_MY_APP")),
+				mcp.Description("IAM app name, e.g. ZIAM_AP_PAYDOC; an EXT app gets the _EXT suffix SAP requires (ZIAM_AP_PAYDOC_EXT)")),
 			mcp.WithString("description", mcp.Required(),
 				mcp.Description("IAM app description")),
 			mcp.WithString("package_name", mcp.Required(),
@@ -315,8 +315,15 @@ func (s *Server) handleCreateIAMApp(ctx context.Context, request mcp.CallToolReq
 	}
 
 	name = strings.ToUpper(name)
-	appURL := adt.IAMAppURL(name)
 	steps := []string{}
+	// HL8 2026-10-02: POST of an EXT app whose name lacks the _EXT suffix fails with
+	// SWB_TOOL 026 "Error while writing the object App to the database"; Eclipse adds
+	// the suffix itself (ZIAM_ZAA01 -> ZIAM_ZAA01_EXT). Do the same.
+	if (appType == "" || strings.EqualFold(appType, adt.IAMAppTypeExternal)) && !strings.HasSuffix(name, "_EXT") {
+		name += "_EXT"
+		steps = append(steps, "name suffixed with _EXT (SAP requires it for EXT apps): "+name)
+	}
+	appURL := adt.IAMAppURL(name)
 
 	if err := s.adtClient.CreateObject(ctx, adt.CreateObjectOptions{
 		ObjectType:  adt.ObjectTypeIAMApp,
