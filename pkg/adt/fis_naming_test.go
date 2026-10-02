@@ -15,6 +15,7 @@ func TestCheckNamingRule(t *testing.T) {
 		{"SUSO/B", "ZAU_APPAY"}, {"NROB/NRO", "ZNR_PAYDOC"}, {"APLO/TYP", "ZAL_AP"}, {"SAJC", "ZAJC_AP_SEND"},
 		{"SAJT", "ZAJT_AP_SEND"}, {"ENHO/XHB", "ZEI_MM_SLOC"}, {"SIA7/AS", "anything"}, {"PROG/P", "ZANY"},
 		{"CLAS/OC", "ZCL_FISST_0927"}, {"MSAG/N", "ZMS_FISST0927"}, {"TABL/DT", "ZTB_FISST_JL0927"}, {"CLAS/OC", "/ABC/CL_X"},
+		{"DDLS/DF", "ZX_I_SALESORDERTP"}, {"BDEF/BDO", "ZX_R_SALESORDERTP"}, {"TABL/DS", "ZST_X_SD_SALESORDER"}, {"CLAS/OC", "ZBP_X_SALESORDERTP"},
 	}
 	for _, c := range ok {
 		if err := checkNamingRule(c[0], c[1]); err != nil {
@@ -25,6 +26,7 @@ func TestCheckNamingRule(t *testing.T) {
 		{"CLAS/OC", "YCL"}, {"CLAS/OC", "ZTEST_CLASS"}, {"TABL/DT", "ZTB_AP_PAYDOC_LONG1"}, {"TABL/DT", "ZPAYDOC"},
 		{"MSAG/N", "ZFI_MSG"}, {"SAJC", "ZJOB_EINV"}, {"NROB/NRO", "ZNR_TOO_LONG"}, {"SRVB/SVB", "ZUI_AP_PAYDOC"},
 		{"DTEL/DE", "ZĐE_X"}, {"DDLX/EX", "ZR_PAYDOCTP"}, {"MSAG/N", "ZFISST0927"}, {"TABL/DT", "ZFISST_0927"},
+		{"TABL/DT", "ZX_SD_SALESORDER"}, {"TABL/DS", "ZX_SD_SALESORDER"}, {"DDLX/EX", "ZX_C_SALESORDERTP"}, {"DDLS/DF", "ZXI_SALESORDER"},
 	}
 	for _, c := range bad {
 		if err := checkNamingRule(c[0], c[1]); err == nil {

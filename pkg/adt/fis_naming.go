@@ -46,12 +46,12 @@ func strictRule(max int, pattern, hint string) namingRule {
 // fisNamingRules is keyed by the main ADT type (the part before "/").
 var fisNamingRules = map[string]namingRule{
 	"TABL": strictRule(16, `^[ZY]TB_`, "table ZTB_<MOD>_<entity> (draft ZTB_…_D) — always ZTB_"),
-	"STRU": nr(30, `^[ZY]ST_`, "structure ZST_<MOD>_<name>"),
-	"DDLS": nr(30, `^[ZY](R|C|I|A)_`, "CDS ZR_ / ZC_ / ZI_ / ZA_"),
-	"BDEF": nr(30, `^[ZY](R|C)_`, "behavior definition = view name ZR_ / ZC_"),
+	"STRU": nr(30, `^[ZY]ST_`, "structure ZST_<MOD>_<name> / structure extend ZST_X_<MOD>_<obj>"),
+	"DDLS": nr(30, `^[ZY](R|C|I|A|X)_`, "CDS ZR_ / ZC_ / ZI_ / ZA_ / extension ZX_<SAP view>"),
+	"BDEF": nr(30, `^[ZY](R|C|X)_`, "behavior definition = view name ZR_ / ZC_ / extension ZX_<SAP BDEF>"),
 	"DDLX": nr(30, `^[ZY]C_`, "metadata extension = projection name ZC_"),
 	"DCLS": nr(30, `^[ZY](R|C|I)_`, "access control = protected view name"),
-	"CLAS": nr(30, `^[ZY](CL|BP_R|CX)_`, "class ZCL_ / behavior pool ZBP_R_ / exception ZCX_"),
+	"CLAS": nr(30, `^[ZY](CL|BP_R|BP_X|CX)_`, "class ZCL_ / behavior pool ZBP_R_ / extension pool ZBP_X_ / exception ZCX_"),
 	"INTF": nr(30, `^[ZY]IF_`, "interface ZIF_"),
 	"DTEL": nr(30, `^[ZY]DE_`, "data element ZDE_"),
 	"DOMA": nr(30, `^[ZY]DO_`, "domain ZDO_"),
