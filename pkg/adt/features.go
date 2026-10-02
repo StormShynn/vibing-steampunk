@@ -227,8 +227,35 @@ func (p *FeatureProber) probeFeature(ctx context.Context, id FeatureID) *Feature
 	return status
 }
 
+// endpointAnswered reports whether an error from an OPTIONS probe still proves
+// the endpoint exists. S/4HANA Cloud Public answers OPTIONS on ADT collections
+// with 400 "HTTP method OPTIONS not supported" (measured on HL8, 2026-10-02):
+// the resource is there, it only refuses the verb.
+func endpointAnswered(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "OPTIONS") && strings.Contains(msg, "not") && strings.Contains(msg, "supported") ||
+		strings.Contains(msg, "status 405")
+}
+
+// isCloudTenant: SAP S/4HANA Cloud Public tenants (my*.s4hana.cloud.sap) always
+// run on HANA, but free SQL on T000/CVERS is not authorized there, so the
+// GetSystemInfo route cannot see it.
+func (p *FeatureProber) isCloudTenant() bool {
+	if p.client == nil || p.client.config == nil {
+		return false
+	}
+	u := strings.ToLower(p.client.config.BaseURL)
+	return strings.Contains(u, ".s4hana.cloud.sap") || strings.Contains(u, ".s4hana.ondemand.com")
+}
+
 // probeHANA checks if running on HANA database
 func (p *FeatureProber) probeHANA(ctx context.Context) (bool, string, error) {
+	if p.isCloudTenant() {
+		return true, "S/4HANA Cloud tenant (always HANA)", nil
+	}
 	info, err := p.client.GetSystemInfo(ctx)
 	if err != nil {
 		return false, "", err
@@ -273,6 +300,9 @@ func (p *FeatureProber) probeRAP(ctx context.Context) (bool, string, error) {
 	resp, err := p.client.transport.Request(ctx, "/sap/bc/adt/ddic/ddl/sources", &RequestOptions{
 		Method: http.MethodOptions,
 	})
+	if endpointAnswered(err) {
+		return true, "RAP endpoints available (OPTIONS refused, endpoint answered)", nil
+	}
 	if err != nil {
 		// Check if it's a 404 vs connection error
 		if strings.Contains(err.Error(), "404") {
@@ -331,7 +361,15 @@ func (p *FeatureProber) probeUI5(ctx context.Context) (bool, string, error) {
 		Method: http.MethodOptions,
 	})
 	if err != nil {
+		if endpointAnswered(err) {
+			return true, "UI5 BSP repository available (OPTIONS refused, endpoint answered)", nil
+		}
 		if strings.Contains(err.Error(), "404") {
+			// Fiori apps are deployed through the ABAP repository OData service,
+			// which does not depend on the ADT filestore resource.
+			if r2, e2 := p.client.transport.Request(ctx, "/sap/opu/odata/UI5/ABAP_REPOSITORY_SRV/$metadata", &RequestOptions{Method: http.MethodGet}); e2 == nil && r2.StatusCode == 200 {
+				return true, "UI5 ABAP repository service available (ADT filestore absent)", nil
+			}
 			return false, "UI5 BSP endpoint not available", nil
 		}
 		return false, "", err
@@ -350,6 +388,9 @@ func (p *FeatureProber) probeTransport(ctx context.Context) (bool, string, error
 	resp, err := p.client.transport.Request(ctx, "/sap/bc/adt/cts/transports", &RequestOptions{
 		Method: http.MethodOptions,
 	})
+	if endpointAnswered(err) {
+		return true, "CTS transport management available (OPTIONS refused, endpoint answered)", nil
+	}
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return false, "CTS endpoint not available", nil
