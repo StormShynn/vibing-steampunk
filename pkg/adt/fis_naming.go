@@ -66,6 +66,7 @@ var fisNamingRules = map[string]namingRule{
 	"SIA6": nr(30, `^[ZY]IAM_`, "IAM app ZIAM_<MOD>_<…>"),
 	"SIA1": nr(30, `^[ZY]BC_`, "business catalog ZBC_<MOD>_<…>"),
 	"SCO1": nr(30, `^[ZY]CS_`, "communication scenario ZCS_<…>"),
+	"SCO3": nr(30, `^[ZY]OS_`, "outbound service ZOS_<MOD>_<obj>; communication-target type ends _COTA"),
 	"APLO": nr(20, `^[ZY]AL_`, "application log object ZAL_<MOD>"),
 	"SAJC": nr(30, `^[ZY]AJC_`, "job catalog entry ZAJC_<MOD>_<…>"),
 	"SAJT": nr(30, `^[ZY]AJT_`, "job template ZAJT_<MOD>_<…>"),

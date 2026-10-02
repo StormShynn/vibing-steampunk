@@ -67,6 +67,7 @@ func focusedToolSet() map[string]bool {
 		"CreateLockObject":            true, // ENQU (FIS)
 		"CreateAuthorizationObject":   true, // SUSO (FIS)
 		"CreateCommunicationScenario": true, // SCO1 (FIS)
+		"CreateOutboundService":       true, // SCO3 (FIS fix-8t)
 		"CreateBAdIImplementation":    true, // ENHO BAdI impl (FIS)
 		"CompareSource":               true, // Diff two objects
 		"CloneObject":                 true, // Copy object to new name

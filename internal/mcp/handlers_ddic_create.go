@@ -293,12 +293,24 @@ func (s *Server) handleCreateAuthorizationObject(ctx context.Context, req mcp.Ca
 
 func (s *Server) handleCreateCommunicationScenario(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	o := adt.CommScenarioOptions{Name: argString(req, "name"), Description: argString(req, "description"),
-		Package: argString(req, "package"), Transport: argString(req, "transport"), InboundServices: argStringList(req, "inbound_services")}
+		Package: argString(req, "package"), Transport: argString(req, "transport"), InboundServices: argStringList(req, "inbound_services"),
+		OutboundServices: argStringList(req, "outbound_services")}
 	u, err := s.adtClient.CreateCommunicationScenario(ctx, o)
 	if err != nil {
 		return newToolResultError(err.Error()), nil
 	}
 	return createdResult("SCO1", o.Name, u, map[string]any{"next": "publish locally in ADT (Publish Locally) before an admin creates the communication arrangement"}), nil
+}
+
+func (s *Server) handleCreateOutboundService(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.OutboundServiceOptions{Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"), Type: argString(req, "service_type"),
+		CommunicationTarget: argString(req, "communication_target"), URLPath: argString(req, "url_path")}
+	u, err := s.adtClient.CreateOutboundService(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return createdResult("SCO3", o.Name, u, map[string]any{"next": "add it to a communication scenario: CreateCommunicationScenario(outbound_services=...)"}), nil
 }
 
 func (s *Server) handleCreateBAdIImplementation(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

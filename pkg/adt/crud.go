@@ -297,6 +297,12 @@ type CreateObjectOptions struct {
 
 	// For BDEF: source code (required for creation - ADT API embeds source in creation request)
 	Source string `json:"source,omitempty"`
+
+	// For a BDEF extension (FIS fix-8t): the extended BDEF (ADT template
+	// property base_bdef) and, for "extension using interface", the BO
+	// interface (interface_bdef). Empty = ordinary root BDEF.
+	BaseBDEF      string `json:"baseBdef,omitempty"`
+	InterfaceBDEF string `json:"interfaceBdef,omitempty"`
 }
 
 // objectTypeInfo contains metadata for creating object types.
@@ -940,13 +946,14 @@ func buildCreateObjectBody(opts CreateObjectOptions, typeInfo objectTypeInfo, de
   adtcore:description="%s"
   adtcore:name="%s"
   adtcore:type="%s"
-  adtcore:responsible="%s">
+  adtcore:responsible="%s">%s
   <adtcore:packageRef adtcore:name="%s"/>
 </blue:blueSource>`,
 			escapeXML(opts.Description),
 			opts.Name,
 			opts.ObjectType,
 			responsible,
+			bdefExtensionTemplate(opts.BaseBDEF, opts.InterfaceBDEF),
 			opts.PackageName)
 	}
 

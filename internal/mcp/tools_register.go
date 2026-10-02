@@ -1273,9 +1273,23 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 			mcp.WithString("name", mcp.Required(), mcp.Description("Scenario ID (Z/Y, max 30)")),
 			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
 			mcp.WithString("inbound_services", mcp.Description("Inbound service IDs, comma separated or JSON array")),
+			mcp.WithString("outbound_services", mcp.Description("Outbound service IDs (SCO3, create with CreateOutboundService first), comma separated or JSON array")),
 			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
 			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
 		), s.handleCreateCommunicationScenario)
+	}
+
+	if shouldRegister("CreateOutboundService") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateOutboundService",
+			mcp.WithDescription("Create and activate an outbound service (SCO3): type COTA (on a communication target, FIS default for new outbound) or REST (HTTP service, old style). Add it to a scenario with CreateCommunicationScenario(outbound_services=...)."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Outbound service ID ZOS_<MOD>_<obj>, with suffix _COTA for type COTA (max 30)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("service_type", mcp.Description("COTA (default) or REST")),
+			mcp.WithString("communication_target", mcp.Description("COTA: the communication target (ZCT_…), must exist")),
+			mcp.WithString("url_path", mcp.Description("REST: default URL path, e.g. /api")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateOutboundService)
 	}
 
 	if shouldRegister("CreateBAdIImplementation") {

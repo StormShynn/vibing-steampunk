@@ -77,6 +77,9 @@ func (s *Server) routeSourceAction(ctx context.Context, action, objectType, obje
 				if v := getStringParam(params, "expected_source_hash"); v != "" {
 					args["expected_source_hash"] = v
 				}
+				if v := getStringParam(params, "extends"); v != "" {
+					args["extends"] = v
+				}
 				// FUNC only: the group, when the caller happens to know it.
 				if v := getStringParam(params, "parent"); v != "" {
 					args["parent"] = v
@@ -165,6 +168,9 @@ func (s *Server) registerWriteSource() {
 		),
 		mcp.WithString("expected_source_hash",
 			mcp.Description("Optional sourceHash returned by GetSource(include_hash=true). After locking, refuse the write if SAP source has changed."),
+		),
+		mcp.WithString("extends",
+			mcp.Description("BDEF only, create: the behavior definition a BDEF extension extends (e.g. R_SALESORDERTP for 'extension using interface i_salesordertp ...', or the projection BDEF for 'extension for projection;'). Required when the source starts with 'extension'."),
 		),
 	), s.handleWriteSource)
 }
@@ -260,8 +266,10 @@ func (s *Server) handleWriteSource(ctx context.Context, request mcp.CallToolRequ
 	method, _ := request.GetArguments()["method"].(string)
 	parent, _ := request.GetArguments()["parent"].(string)
 	expectedSourceHash, _ := request.GetArguments()["expected_source_hash"].(string)
+	extends, _ := request.GetArguments()["extends"].(string)
 
 	opts := &adt.WriteSourceOptions{
+		Extends:            extends,
 		Description:        description,
 		Package:            packageName,
 		Parent:             parent,

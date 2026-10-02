@@ -169,6 +169,9 @@ type WriteSourceOptions struct {
 	// for an update, VSP re-reads the source after taking the write lock and
 	// refuses to overwrite a version changed since that read.
 	ExpectedSourceHash string
+	// Extends: for BDEF only — the behavior definition this BDEF extension
+	// extends (FIS fix-8t). Needed when the source starts with "extension".
+	Extends string
 }
 
 // WriteSourceResult represents the result of WriteSource operation
@@ -642,6 +645,12 @@ func (c *Client) writeSourceCreate(ctx context.Context, objectType, name, source
 		}
 		if objectType == "BDEF" {
 			createOpts.Source = source // BDEF requires source embedded in creation request
+			base, iface, extErr := bdefExtensionTargets(source, opts.Extends)
+			if extErr != nil {
+				result.Message = extErr.Error()
+				return result, nil
+			}
+			createOpts.BaseBDEF, createOpts.InterfaceBDEF = base, iface
 		}
 		var chosen TransportChoice
 		createOpts.Chosen = &chosen
