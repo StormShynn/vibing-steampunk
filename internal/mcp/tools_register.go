@@ -1192,8 +1192,8 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 
 	if shouldRegister("CreateServerDrivenObject") {
 		s.mcpServer.AddTool(mcp.NewTool("CreateServerDrivenObject",
-			mcp.WithDescription("Create and activate a server-driven ADT object (blue shell + JSON source, the form editors in ADT): NROB number range object, APLO application log object, SAJC/SAJT job catalog/template, and — document format not yet verified — CHDO. Authorization objects/fields, communication scenarios and BAdI implementations have their own tools. Read an existing object's JSON with GetADTObjectXML(<uri>/source/main) first and pass the same shape; header is filled in when missing."),
-			mcp.WithString("object_type", mcp.Required(), mcp.Description("NROB | APLO | SAJC | SAJT | CHDO")),
+			mcp.WithDescription("Create and activate a server-driven ADT object (blue shell + JSON source, the form editors in ADT): NROB number range object, APLO application log object, SAJC/SAJT job catalog/template (SAJC JSON may carry \"parameters\":[{\"name\":\"P_X\",\"title\":\"…\"}] for IF_APJ_RT_RUN classes; SAJT \"parameters\":{\"singleValueParameters\":[{\"name\":…,\"value\":…}]}), COTA communication target ({\"configuration\":{\"communicationType\":\"http\",\"communicationTargetClass\":\"<NAME>\",\"allowMultipleDestinations\":true}}), and — document format not yet verified — CHDO. Authorization objects/fields, communication scenarios and BAdI implementations have their own tools. Read an existing object's JSON with GetADTObjectXML(<uri>/source/main) first and pass the same shape; header is filled in when missing."),
+			mcp.WithString("object_type", mcp.Required(), mcp.Description("NROB | APLO | SAJC | SAJT | COTA | CHDO")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Object name (Z/Y)")),
 			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
 			mcp.WithString("json_source", mcp.Description("JSON content document (without header is fine)")),
@@ -1227,6 +1227,20 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
 			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
 		), s.handleCreateApplicationLogObject)
+	}
+
+	if shouldRegister("CreateLockObject") {
+		s.mcpServer.AddTool(mcp.NewTool("CreateLockObject",
+			mcp.WithDescription("Create and activate a lock object (ENQU) on one Z table; used in ABAP Cloud through CL_ABAP_LOCK_OBJECT_FACTORY. Lock parameters = the table's key fields."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Lock object name, EZ + table name without the leading Z, max 16 (e.g. EZTB_AP_PAYDOC)")),
+			mcp.WithString("description", mcp.Required(), mcp.Description("Description (max 60)")),
+			mcp.WithString("table", mcp.Required(), mcp.Description("Primary table (Z/Y)")),
+			mcp.WithString("fields", mcp.Required(), mcp.Description("Key fields in key order, including the client field: comma separated or JSON array")),
+			mcp.WithString("lock_mode", mcp.Description("E write lock (default), S read lock, X exclusive not cumulative, O optimistic")),
+			mcp.WithBoolean("allow_rfc", mcp.Description("Allow RFC for the lock modules (default false)")),
+			mcp.WithString("package", mcp.Description("Target package (default: $TMP)")),
+			mcp.WithString("transport", mcp.Description("Transport request (ask the user; optional for local packages)")),
+		), s.handleCreateLockObject)
 	}
 
 	if shouldRegister("CreateAuthorizationField") {

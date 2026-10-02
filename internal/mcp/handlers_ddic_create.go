@@ -269,6 +269,17 @@ func (s *Server) handleCreateAuthorizationField(ctx context.Context, req mcp.Cal
 	return createdResult("AUTH", o.Name, u, nil), nil
 }
 
+func (s *Server) handleCreateLockObject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	o := adt.LockObjectOptions{Name: argString(req, "name"), Description: argString(req, "description"),
+		Package: argString(req, "package"), Transport: argString(req, "transport"), Table: argString(req, "table"),
+		Fields: argStringList(req, "fields"), LockMode: argString(req, "lock_mode"), AllowRFC: argBool(req, "allow_rfc")}
+	u, err := s.adtClient.CreateLockObject(ctx, o)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	return createdResult("ENQU", o.Name, u, map[string]any{"next": "use it in ABAP Cloud via cl_abap_lock_object_factory=>get_instance( iv_name = '<NAME>' )"}), nil
+}
+
 func (s *Server) handleCreateAuthorizationObject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	o := adt.AuthObjectOptions{Name: argString(req, "name"), Description: argString(req, "description"),
 		Package: argString(req, "package"), Transport: argString(req, "transport"),

@@ -48,6 +48,10 @@ var serverDrivenTypes = map[string]serverDrivenType{
 	"NROB": {"/sap/bc/adt/numberranges/objects", "NROB/NRO", 10},
 	"APLO": {"/sap/bc/adt/applicationlog/objects", "APLO/TYP", 20},
 	"CHDO": {"/sap/bc/adt/changedocuments/objects", "CHDO/CHD", 15}, // [Unverified] JSON
+	// COTA: AFF JSON (SAP/abap-file-formats cota-v1.json): {"configuration":{"communicationType":"http",
+	// "communicationTargetClass":"<NAME>","allowMultipleDestinations":true},"httpSettings":{"pathPrefix":"/…"}}.
+	// URI and type read from HL8 (SearchObject *_COTA, 2026-10-02): /sap/bc/adt/conn/commtargets, COTA/TYP.
+	"COTA": {"/sap/bc/adt/conn/commtargets", "COTA/TYP", 30},
 }
 
 // serverDrivenShellTypes: blues v2 (SAJC/SAJT verified), then v1 (what NROB/APLO serve).

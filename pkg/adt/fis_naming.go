@@ -69,6 +69,8 @@ var fisNamingRules = map[string]namingRule{
 	"APLO": nr(20, `^[ZY]AL_`, "application log object ZAL_<MOD>"),
 	"SAJC": nr(30, `^[ZY]AJC_`, "job catalog entry ZAJC_<MOD>_<…>"),
 	"SAJT": nr(30, `^[ZY]AJT_`, "job template ZAJT_<MOD>_<…>"),
+	"COTA": nr(30, `^[ZY]CT_`, "communication target ZCT_<MOD>_<partner> (SAP: CT_ so the generated class does not clash with CL_)"),
+	"ENQU": nr(16, `^E[ZY]`, "lock object EZ + table name without the leading Z, e.g. EZTB_AP_PAYDOC"),
 	"DEVC": nr(30, `^[ZY]`, "package Z… (ZPK_<PROJECT>_<MOD> or the project's package tree)"),
 }
 

@@ -64,6 +64,7 @@ func focusedToolSet() map[string]bool {
 		"CreateNumberRangeObject":     true, // NROB via ADT (FIS)
 		"CreateApplicationLogObject":  true, // APLO via ADT (FIS)
 		"CreateAuthorizationField":    true, // AUTH (FIS)
+		"CreateLockObject":            true, // ENQU (FIS)
 		"CreateAuthorizationObject":   true, // SUSO (FIS)
 		"CreateCommunicationScenario": true, // SCO1 (FIS)
 		"CreateBAdIImplementation":    true, // ENHO BAdI impl (FIS)

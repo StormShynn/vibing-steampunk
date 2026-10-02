@@ -37,6 +37,8 @@ var adtXMLReadPrefixes = []string{
 	"/sap/bc/adt/enhancements/",  // BAdI implementations (ENHO)
 	"/sap/bc/adt/businessobjects/",
 	"/sap/bc/adt/businessservices/",
+	"/sap/bc/adt/conn/", // communication targets (COTA)
+	"/sap/bc/adt/bo/",   // behavior definitions (BDEF documents, extensions)
 }
 
 // serverDrivenAccept returns the media type ADT wants for the server-driven

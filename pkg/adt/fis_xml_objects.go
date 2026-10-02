@@ -27,6 +27,7 @@ const (
 	ObjectTypeAuthObject   CreatableObjectType = "SUSO/B"
 	ObjectTypeCommScenario CreatableObjectType = "SCO1"
 	ObjectTypeBAdIImpl     CreatableObjectType = "ENHO/XHB"
+	ObjectTypeLockObject   CreatableObjectType = "ENQU/DL"
 )
 
 type fisXMLType struct {
@@ -42,6 +43,8 @@ var fisXMLTypes = map[CreatableObjectType]fisXMLType{
 	ObjectTypeAuthField:    {"/sap/bc/adt/aps/iam/auth", "auth:auth", `xmlns:auth="http://www.sap.com/iam/auth"`, "AUTH", "", ""},
 	ObjectTypeAuthObject:   {"/sap/bc/adt/aps/iam/suso", "suso:suso", `xmlns:suso="http://www.sap.com/iam/suso"`, "SUSO/B", "", ""},
 	ObjectTypeCommScenario: {"/sap/bc/adt/aps/cloud/com/sco1", "sco1:sco1", `xmlns:sco1="http://www.sap.com/com/sco1"`, "SCO1", "", ""},
+	// ENQU: document shape read from HL8 EMEKKOE (2026-10-02), media type application/vnd.sap.adt.lockobjects.v1+xml.
+	ObjectTypeLockObject: {"/sap/bc/adt/ddic/lockobjects/sources", "enqu:lockobject", `xmlns:enqu="http://www.sap.com/adt/ddic/enqu"`, "ENQU/DL", "", ""},
 	ObjectTypeBAdIImpl: {"/sap/bc/adt/enhancements/enhoxhb", "enho:objectData", `xmlns:enho="http://www.sap.com/adt/enhancements/enho"`, "ENHO/XHB",
 		` xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"`,
 		""},
@@ -53,6 +56,9 @@ func init() {
 		info := objectTypeInfo{creationPath: t.collection, rootName: t.root, namespace: t.ns}
 		if ot == ObjectTypeBAdIImpl {
 			info.contentType = "application/vnd.sap.adt.enh.enhoxhb.v4+xml"
+		}
+		if ot == ObjectTypeLockObject {
+			info.contentType = "application/vnd.sap.adt.lockobjects.v1+xml"
 		}
 		info.bodyBuilder = func(opts CreateObjectOptions, ti objectTypeInfo, responsible string) string {
 			return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
