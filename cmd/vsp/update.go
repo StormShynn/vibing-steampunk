@@ -271,6 +271,9 @@ func replaceExecutable(target, tmp string) error {
 // A leading v and any -prerelease or +build suffix are tolerated; "dev" and
 // other non-numeric strings are unknown, not zero.
 func parseVersion(s string) ([3]int, bool) {
+	if fv, ok, isFIS := parseFISVersion(s); isFIS {
+		return fv, ok
+	}
 	var v [3]int
 	s = strings.TrimSpace(strings.TrimPrefix(s, "v"))
 	if i := strings.IndexAny(s, "-+"); i >= 0 {
@@ -329,7 +332,7 @@ func checksumFor(text, asset string) (string, bool) {
 func fetchRelease(ctx context.Context, tag string) (*release, error) {
 	url := updateAPIBase + "/releases/latest"
 	if tag != "" {
-		if _, ok := parseVersion(tag); ok && !strings.HasPrefix(tag, "v") {
+		if _, ok := parseVersion(tag); ok && !strings.HasPrefix(tag, "v") && tag[0] >= '0' && tag[0] <= '9' {
 			tag = "v" + tag
 		}
 		url = updateAPIBase + "/releases/tags/" + tag
