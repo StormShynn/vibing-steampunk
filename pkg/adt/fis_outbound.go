@@ -97,7 +97,7 @@ func buildOutboundServicesXML(obs []string) string {
 	for i, id := range ids {
 		typ, txt := "REST", "HTTP Service"
 		if strings.HasSuffix(id, "_COTA") {
-			typ, txt = "COTA", "Communication Target" // [Unverified] text; SAP recomputes texts
+			typ, txt = "COTA", "Communication Target" // text as SAP returns it (HL8 2026-10-03)
 		}
 		fmt.Fprintf(&b, "      <sco1:outboundService><sco1:outboundID>%04d</sco1:outboundID><sco1:obsID>%s</sco1:obsID><sco1:obsType>%s</sco1:obsType><sco1:obsTypeText>%s</sco1:obsTypeText><sco1:text/><sco1:isMandatory>false</sco1:isMandatory><sco1:partnerType/><sco1:partnerRole/><sco1:messageCode/><sco1:messageFunction/><sco1:processCode/><sco1:supportsPing>false</sco1:supportsPing><sco1:defaultUrl/><sco1:isVirtual>false</sco1:isVirtual><sco1:jobDefinitionName/><sco1:useDefaultLogicalPort>false</sco1:useDefaultLogicalPort><sco1:outputMode/><sco1:receiverPortType/><sco1:packageSize>0000</sco1:packageSize><sco1:queueProcessing>false</sco1:queueProcessing><sco1:usesChangepointer>false</sco1:usesChangepointer><sco1:idocContentType/><sco1:sendDnyEnhSeg>false</sco1:sendDnyEnhSeg><sco1:httpVersion>0</sco1:httpVersion><sco1:httpCompressRequest>0</sco1:httpCompressRequest><sco1:httpCompressReply>false</sco1:httpCompressReply></sco1:outboundService>\n",
 			i+1, escapeXML(id), typ, txt)

@@ -1279,6 +1279,13 @@ func (s *Server) registerCRUDTools(shouldRegister func(string) bool) {
 		), s.handleCreateCommunicationScenario)
 	}
 
+	if shouldRegister("PublishCommunicationScenario") {
+		s.mcpServer.AddTool(mcp.NewTool("PublishCommunicationScenario",
+			mcp.WithDescription("Publish Locally a customer communication scenario (SCO1) so an admin can create a communication arrangement for it. Returns SAP's publishing status: p = published, u = not published."),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Communication scenario ID (ZCS_…)")),
+		), s.handlePublishCommunicationScenario)
+	}
+
 	if shouldRegister("CreateOutboundService") {
 		s.mcpServer.AddTool(mcp.NewTool("CreateOutboundService",
 			mcp.WithDescription("Create and activate an outbound service (SCO3): type COTA (on a communication target, FIS default for new outbound) or REST (HTTP service, old style). Add it to a scenario with CreateCommunicationScenario(outbound_services=...)."),

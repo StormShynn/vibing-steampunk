@@ -302,6 +302,20 @@ func (s *Server) handleCreateCommunicationScenario(ctx context.Context, req mcp.
 	return createdResult("SCO1", o.Name, u, map[string]any{"next": "publish locally in ADT (Publish Locally) before an admin creates the communication arrangement"}), nil
 }
 
+func (s *Server) handlePublishCommunicationScenario(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	name := argString(req, "name")
+	status, raw, err := s.adtClient.PublishCommunicationScenario(ctx, name)
+	if err != nil {
+		return newToolResultError(err.Error()), nil
+	}
+	out := map[string]any{"name": strings.ToUpper(name), "status": status, "published": status == "p"}
+	if status == "" {
+		out["raw"] = raw
+	}
+	b, _ := json.MarshalIndent(out, "", "  ")
+	return mcp.NewToolResultText(string(b)), nil
+}
+
 func (s *Server) handleCreateOutboundService(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	o := adt.OutboundServiceOptions{Name: argString(req, "name"), Description: argString(req, "description"),
 		Package: argString(req, "package"), Transport: argString(req, "transport"), Type: argString(req, "service_type"),
